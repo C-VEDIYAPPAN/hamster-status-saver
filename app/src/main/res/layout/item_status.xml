@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.statusvault.app.AspectFrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_tile"
+    android:descendantFocusability="blocksDescendants">
+
+    <ImageView
+        android:id="@+id/thumb"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="centerCrop" />
+
+    <ImageView
+        android:id="@+id/play"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_play_badge"
+        android:contentDescription="Video"
+        android:padding="8dp"
+        android:src="@drawable/ic_play"
+        android:visibility="gone" />
+
+    <ImageButton
+        android:id="@+id/save"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:layout_gravity="bottom|end"
+        android:layout_margin="6dp"
+        android:background="@drawable/bg_save_button"
+        android:contentDescription="Save"
+        android:focusable="false"
+        android:focusableInTouchMode="false"
+        android:padding="8dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_download"
+        android:tint="@color/on_primary_container" />
+</com.statusvault.app.AspectFrameLayout>

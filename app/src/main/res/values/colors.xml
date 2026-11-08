@@ -1,0 +1,14 @@
+<resources>
+    <color name="brand_start">#0B5F63</color>
+    <color name="brand_end">#19A99A</color>
+    <color name="bg">#F6FAF9</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_variant">#E3ECEB</color>
+    <color name="on_surface">#161D1D</color>
+    <color name="on_surface_variant">#4A5655</color>
+    <color name="outline">#B9C6C5</color>
+    <color name="primary">#00696B</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="primary_container">#C8F0EE</color>
+    <color name="on_primary_container">#00302F</color>
+</resources>

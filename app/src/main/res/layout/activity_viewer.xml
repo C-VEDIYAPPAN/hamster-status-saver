@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.statusvault.app.SwipeFrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/black"
+    android:fitsSystemWindows="true">
+
+    <ImageView
+        android:id="@+id/image"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@null"
+        android:scaleType="fitCenter" />
+
+    <VideoView
+        android:id="@+id/video"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/play_state"
+        android:layout_width="72dp"
+        android:layout_height="72dp"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_play_badge"
+        android:contentDescription="Play"
+        android:padding="18dp"
+        android:src="@drawable/ic_play"
+        android:visibility="gone" />
+
+    <ProgressBar
+        android:id="@+id/progress"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        android:indeterminateTint="#7DD6D2"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/top_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="@drawable/bg_scrim_top"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="24dp">
+
+        <ImageButton
+            android:id="@+id/close"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Close"
+            android:src="@drawable/ic_close" />
+
+        <TextView
+            android:id="@+id/title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#E6FFFFFF"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/counter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/bottom_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:background="@drawable/bg_scrim_bottom"
+        android:gravity="center"
+        android:orientation="horizontal"
+        android:paddingTop="32dp"
+        android:paddingBottom="24dp">
+
+        <Button
+            android:id="@+id/save"
+            style="@style/ViewerButton"
+            android:background="@drawable/bg_viewer_primary"
+            android:drawableStart="@drawable/ic_download"
+            android:drawableTint="#003735"
+            android:text="Save"
+            android:textColor="#003735" />
+
+        <Button
+            android:id="@+id/share"
+            style="@style/ViewerButton"
+            android:layout_marginStart="12dp"
+            android:background="@drawable/bg_viewer_secondary"
+            android:drawableStart="@drawable/ic_share"
+            android:drawableTint="#FFFFFF"
+            android:text="Share"
+            android:textColor="#FFFFFF" />
+    </LinearLayout>
+</com.statusvault.app.SwipeFrameLayout>
