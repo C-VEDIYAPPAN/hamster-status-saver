@@ -169,7 +169,7 @@ public class SettingsActivity extends BaseActivity {
                 prefs.setSort(i);
             }
         }), segmentParams());
-        toggle(browsing, "Highlight new statuses", "A story-style ring around statuses you haven't opened",
+        toggle(browsing, "Highlight new statuses", "A colourful, slowly turning ring around statuses you haven't opened",
                 prefs.newBadges(), new Toggle() {
                     @Override
                     public void changed(ToggleSwitch s, boolean on) {
@@ -177,7 +177,7 @@ public class SettingsActivity extends BaseActivity {
                         renderPreview();
                     }
                 });
-        toggle(browsing, "Show time left", "A bar showing how long until WhatsApp deletes a status (estimated)",
+        toggle(browsing, "Show time left", "A small timer showing how long until WhatsApp deletes a status (estimated)",
                 prefs.timeLeft(), new Toggle() {
                     @Override
                     public void changed(ToggleSwitch s, boolean on) {
@@ -378,7 +378,11 @@ public class SettingsActivity extends BaseActivity {
         // Outer frame = story ring for "new"; inner = the tile itself.
         FrameLayout outer = new FrameLayout(this);
         if (isNew) {
-            outer.setBackground(pal.gradient(13));
+            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
+                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                    new int[]{pal.primary, pal.secondary, 0xFFFF6F91, 0xFFFFC75F});
+            g.setCornerRadius(dp(13));
+            outer.setBackground(g);
             outer.setPadding(dp(2), dp(2), dp(2), dp(2));
         }
         FrameLayout tile = new FrameLayout(this);
@@ -386,18 +390,13 @@ public class SettingsActivity extends BaseActivity {
         outer.addView(tile, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         if (prefs.timeLeft()) {
-            // Expiry bar along the bottom
-            FrameLayout track = new FrameLayout(this);
-            track.setBackground(pal.rounded(0x40FFFFFF, 2));
-            View fill = new View(this);
-            fill.setBackground(pal.rounded(pal.primary, 2));
-            float frac = 1f - (i % 5) * 0.18f;
-            fill.setPivotX(0);
-            fill.setScaleX(frac);
-            track.addView(fill, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-            FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(3), Gravity.BOTTOM);
-            tp.setMargins(dp(6), 0, dp(26), dp(8));
-            tile.addView(track, tp);
+            // Circular countdown, bottom-left
+            CountdownBadge cd = new CountdownBadge(this);
+            long hoursLeft = Math.max(1, 23 - (i % 5) * 4);
+            cd.set(hoursLeft * 3600_000L, hoursLeft < 3 ? 0xFFFF8A80 : pal.primary);
+            FrameLayout.LayoutParams cp = new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.BOTTOM | Gravity.START);
+            cp.setMargins(dp(4), 0, 0, dp(4));
+            tile.addView(cd, cp);
         }
         ImageView save = new ImageView(this);
         save.setImageResource(R.drawable.ic_download);

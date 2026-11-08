@@ -335,8 +335,8 @@ public class MainActivity extends BaseActivity {
     private void applyColors() {
         root.setBackground(palette.backgroundGlow(getColor(R.color.bg), getResources().getDisplayMetrics().widthPixels));
         progress.setIndeterminateTintList(ColorStateList.valueOf(palette.primary));
-        floatingBar.setBackground(palette.glass(getColor(R.color.surface), 34));
-        navIndicator.setBackground(palette.gradient(27));
+        floatingBar.setBackground(palette.glass(getColor(R.color.surface), 28));
+        navIndicator.setBackground(palette.gradient(22));
         saveAll.setBackground(palette.rounded(palette.primary, 18));
         saveAll.setTextColor(palette.onPrimary);
         saveAll.setCompoundDrawableTintList(ColorStateList.valueOf(palette.onPrimary));
@@ -572,20 +572,20 @@ public class MainActivity extends BaseActivity {
             iconBox.setClipChildren(false);
             ImageView icon = new ImageView(this);
             icon.setImageResource(icons[i]);
-            iconBox.addView(icon, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+            iconBox.addView(icon, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
             TextView badge = new TextView(this);
-            badge.setTextSize(10);
+            badge.setTextSize(9);
             badge.setGravity(Gravity.CENTER);
-            badge.setMinWidth(dp(17));
+            badge.setMinWidth(dp(15));
             badge.setPadding(dp(4), 0, dp(4), 0);
             badge.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             badge.setVisibility(View.GONE);
-            FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(17), Gravity.TOP | Gravity.END);
+            FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(15), Gravity.TOP | Gravity.END);
             iconBox.addView(badge, bp);
-            item.addView(iconBox, new LinearLayout.LayoutParams(dp(44), dp(28)));
+            item.addView(iconBox, new LinearLayout.LayoutParams(dp(40), dp(22)));
             TextView label = new TextView(this);
             label.setText(SECTION_TITLES[i]);
-            label.setTextSize(11);
+            label.setTextSize(10);
             label.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             label.setGravity(Gravity.CENTER);
             label.setMaxLines(1);
@@ -630,10 +630,10 @@ public class MainActivity extends BaseActivity {
         item.setContentDescription(label);
         ImageView iv = new ImageView(this);
         iv.setImageResource(icon);
-        item.addView(iv, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        item.addView(iv, new LinearLayout.LayoutParams(dp(20), dp(20)));
         TextView tv = new TextView(this);
         tv.setText(label);
-        tv.setTextSize(11);
+        tv.setTextSize(10);
         tv.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         tv.setPadding(0, dp(4), 0, 0);
         tv.setGravity(Gravity.CENTER);
@@ -685,7 +685,7 @@ public class MainActivity extends BaseActivity {
         int barWidth = navTabs.getWidth();
         if (barWidth == 0) return;
         int tabWidth = barWidth / 3;
-        int inset = dp(7);
+        int inset = dp(6);
         int pillWidth = tabWidth - inset * 2;
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) navIndicator.getLayoutParams();
         if (lp.width != pillWidth) {
@@ -783,20 +783,14 @@ public class MainActivity extends BaseActivity {
                 bottomInset = insets.getSystemWindowInsetBottom();
                 FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) floatingBar.getLayoutParams();
                 lp.bottomMargin = bottomInset + dp(14);
-                // On tablets / landscape, keep the bar a comfortable width, centred.
-                float widthDp = root.getWidth() > 0 ? root.getWidth() / getResources().getDisplayMetrics().density
-                        : getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density;
-                if (widthDp > 560) {
-                    lp.width = dp(480);
-                    lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-                } else {
-                    lp.width = FrameLayout.LayoutParams.MATCH_PARENT;
-                    lp.gravity = Gravity.BOTTOM;
-                }
+                // Compact pill: at most 330dp wide (16dp from the edges on small phones), centred.
+                int screen = root.getWidth() > 0 ? root.getWidth() : getResources().getDisplayMetrics().widthPixels;
+                lp.width = Math.min(screen - dp(32), dp(330));
+                lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
                 floatingBar.setLayoutParams(lp);
                 // Let the grid scroll under the floating bar, but end above it.
                 grid.setPadding(grid.getPaddingLeft(), grid.getPaddingTop(), grid.getPaddingRight(),
-                        bottomInset + dp(14 + 68 + 18));
+                        bottomInset + dp(14 + 56 + 16));
                 return insets;
             }
         });
@@ -1196,14 +1190,12 @@ public class MainActivity extends BaseActivity {
                 v.findViewById(R.id.card).setClipToOutline(true);
             }
             final StatusItem item = getItem(position);
-            View ring = v;
+            AspectFrameLayout ring = (AspectFrameLayout) v;
             View card = v.findViewById(R.id.card);
             ImageView thumb = (ImageView) v.findViewById(R.id.thumb);
             final TextView duration = (TextView) v.findViewById(R.id.duration);
-            TextView timeLeft = (TextView) v.findViewById(R.id.time_left);
+            CountdownBadge countdown = (CountdownBadge) v.findViewById(R.id.countdown);
             ImageButton saveBtn = (ImageButton) v.findViewById(R.id.save);
-            View track = v.findViewById(R.id.expiry_track);
-            View fill = v.findViewById(R.id.expiry_fill);
             View bottomRow = v.findViewById(R.id.bottom_row);
             View overlay = v.findViewById(R.id.sel_overlay);
             ImageView check = (ImageView) v.findViewById(R.id.sel_check);
@@ -1216,7 +1208,7 @@ public class MainActivity extends BaseActivity {
             boolean compact = cols >= 5;
             boolean small = cols >= 4;
             ViewGroup.LayoutParams sbp = saveBtn.getLayoutParams();
-            int sbSize = dp(small ? 26 : 32);
+            int sbSize = dp(compact ? 24 : small ? 26 : 30);
             if (sbp.width != sbSize) {
                 sbp.width = sbSize;
                 sbp.height = sbSize;
@@ -1226,8 +1218,13 @@ public class MainActivity extends BaseActivity {
 
             // Story-style ring on statuses you haven't opened
             boolean isNew = isStatus && prefs.newBadges() && !seen.contains(item.name);
-            ring.setBackground(isNew ? palette.gradient(22) : null);
-            card.setBackground(palette.rounded(getColor(R.color.surface_variant), isNew ? 19 : 20));
+            if (isNew) {
+                ring.setRing(new int[]{palette.primary, palette.secondary, 0xFFFF6F91, 0xFFFFC75F, palette.primary});
+            } else {
+                ring.setHairline(palette.dark ? 0x2EFFFFFF : 0x1F000000);
+            }
+            card.setBackground(palette.rounded(getColor(R.color.surface_variant), 18));
+            ring.setSelected(isSelected);
 
             // Thumbnail + duration (videos)
             duration.setVisibility(View.GONE);
@@ -1244,16 +1241,16 @@ public class MainActivity extends BaseActivity {
                 duration.setVisibility(View.VISIBLE); // play glyph until the length is known
             }
 
-            // Time left + expiry bar
+            // Circular countdown: the ring drains as the 24h run out (red under 3h)
             long left = isStatus && prefs.timeLeft() ? item.millisLeft(System.currentTimeMillis()) : -1;
-            boolean showTime = left > 0 && !compact;
-            timeLeft.setText(showTime ? timeLeftLabel(left).replace(" left", "") : "");
-            track.setVisibility(left > 0 ? View.VISIBLE : View.GONE);
-            if (left > 0) {
-                float frac = Math.min(1f, left / (24f * 3600_000f));
-                fill.setPivotX(0);
-                fill.setScaleX(frac);
-                fill.setBackground(palette.rounded(left < 3 * 3600_000L ? palette.error : palette.primary, 2));
+            countdown.setVisibility(left > 0 && !selecting ? View.VISIBLE : View.INVISIBLE);
+            if (left > 0) countdown.set(left, left < 3 * 3600_000L ? 0xFFFF8A80 : palette.primary);
+            ViewGroup.LayoutParams clp = countdown.getLayoutParams();
+            int cSize = dp(compact ? 24 : small ? 26 : 30);
+            if (clp.width != cSize) {
+                clp.width = cSize;
+                clp.height = cSize;
+                countdown.setLayoutParams(clp);
             }
 
             // Save button: glass circle, or accent with a check once saved

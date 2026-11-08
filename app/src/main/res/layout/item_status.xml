@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Outer frame draws the story-style ring (unseen statuses); the inner card holds the media. -->
+<!-- Outer frame draws the rotating story ring (unseen) or a hairline (seen); the inner card holds the media. -->
 <com.statusvault.app.AspectFrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/ring"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:descendantFocusability="blocksDescendants"
-    android:padding="3dp">
+    android:padding="4dp">
 
     <FrameLayout
         android:id="@+id/card"
@@ -42,59 +42,38 @@
             android:textSize="11sp"
             android:visibility="gone" />
 
+        <!-- Bottom row: circular countdown (statuses) and the save button -->
         <LinearLayout
             android:id="@+id/bottom_row"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            android:orientation="vertical"
-            android:paddingStart="9dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="7dp"
             android:paddingEnd="7dp"
-            android:paddingBottom="8dp">
+            android:paddingBottom="7dp">
 
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+            <com.statusvault.app.CountdownBadge
+                android:id="@+id/countdown"
+                android:layout_width="30dp"
+                android:layout_height="30dp" />
 
-                <TextView
-                    android:id="@+id/time_left"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:fontFamily="sans-serif-medium"
-                    android:shadowColor="#80000000"
-                    android:shadowRadius="4"
-                    android:textColor="#FFFFFF"
-                    android:textSize="12sp" />
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
-                <ImageButton
-                    android:id="@+id/save"
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
-                    android:contentDescription="Save"
-                    android:focusable="false"
-                    android:focusableInTouchMode="false"
-                    android:padding="7dp"
-                    android:scaleType="fitCenter"
-                    android:src="@drawable/ic_download" />
-            </LinearLayout>
-
-            <!-- Time left until WhatsApp deletes it -->
-            <FrameLayout
-                android:id="@+id/expiry_track"
-                android:layout_width="match_parent"
-                android:layout_height="3dp"
-                android:layout_marginTop="6dp"
-                android:layout_marginEnd="2dp"
-                android:background="@drawable/bg_expiry_track">
-
-                <View
-                    android:id="@+id/expiry_fill"
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent" />
-            </FrameLayout>
+            <ImageButton
+                android:id="@+id/save"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:contentDescription="Save"
+                android:focusable="false"
+                android:focusableInTouchMode="false"
+                android:padding="7dp"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_download" />
         </LinearLayout>
 
         <View
