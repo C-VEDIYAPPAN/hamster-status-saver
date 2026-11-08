@@ -55,10 +55,11 @@ public class SwipeFrameLayout extends FrameLayout {
 
     /** Taps on the bars' buttons should not count as "tap on media". */
     private boolean isOnClickableChild(MotionEvent ev) {
-        int[] ids = {R.id.top_bar, R.id.bottom_bar};
+        int[] ids = {R.id.top_bar, R.id.bottom_bar, R.id.video_controls, R.id.prev, R.id.next, R.id.play_state};
         for (int id : ids) {
             android.view.View v = findViewById(id);
-            if (v != null && v.getVisibility() == VISIBLE
+            if (v != null && v.getVisibility() == VISIBLE && v.getAlpha() > 0.1f
+                    && ev.getX() >= v.getLeft() && ev.getX() <= v.getRight()
                     && ev.getY() >= v.getTop() && ev.getY() <= v.getBottom()) {
                 return true;
             }

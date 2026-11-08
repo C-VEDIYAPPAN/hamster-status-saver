@@ -106,6 +106,23 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     private View topBar;
     private LinearLayout bottomBar;
     private View actSave, actRepost, actShare, actFrame, actDelete;
+    private View prevBtn, nextBtn, videoControls;
+    private android.widget.ImageButton playPause;
+    private android.widget.SeekBar seek;
+    private TextView positionText, durationText;
+    private boolean userSeeking;
+    /** Moves the seek bar along while a video plays. */
+    private final Runnable ticker = new Runnable() {
+        @Override
+        public void run() {
+            if (video != null && video.getVisibility() == View.VISIBLE) {
+                int pos = video.getCurrentPosition();
+                if (!userSeeking) seek.setProgress(pos);
+                positionText.setText(MainActivity.durationLabel(pos));
+            }
+            main.postDelayed(this, 250);
+        }
+    };
 
     @Override
     @SuppressWarnings("deprecation")
@@ -154,6 +171,55 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         counter = (TextView) findViewById(R.id.counter);
         topBar = findViewById(R.id.top_bar);
         bottomBar = (LinearLayout) findViewById(R.id.bottom_bar);
+        prevBtn = findViewById(R.id.prev);
+        nextBtn = findViewById(R.id.next);
+        videoControls = findViewById(R.id.video_controls);
+        playPause = (android.widget.ImageButton) findViewById(R.id.play_pause);
+        seek = (android.widget.SeekBar) findViewById(R.id.seek);
+        positionText = (TextView) findViewById(R.id.position);
+        durationText = (TextView) findViewById(R.id.duration_total);
+        seek.setProgressTintList(ColorStateList.valueOf(accent));
+        seek.setThumbTintList(ColorStateList.valueOf(accent));
+        seek.setProgressBackgroundTintList(ColorStateList.valueOf(0x66FFFFFF));
+        prevBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                onSwipePrevious();
+            }
+        });
+        nextBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                onSwipeNext();
+            }
+        });
+        View.OnClickListener toggle = new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                togglePlay();
+            }
+        };
+        playPause.setOnClickListener(toggle);
+        playState.setOnClickListener(toggle);
+        seek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(android.widget.SeekBar s, int progress, boolean fromUser) {
+                if (fromUser) positionText.setText(MainActivity.durationLabel(progress));
+            }
+
+            @Override
+            public void onStartTrackingTouch(android.widget.SeekBar s) {
+                userSeeking = true;
+            }
+
+            @Override
+            public void onStopTrackingTouch(android.widget.SeekBar s) {
+                userSeeking = false;
+                video.seekTo(s.getProgress());
+            }
+        });
 
         findViewById(R.id.close).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -185,6 +251,9 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
             android.widget.FrameLayout.LayoutParams blp = (android.widget.FrameLayout.LayoutParams) bottomBar.getLayoutParams();
             blp.width = dp(460);
             bottomBar.setLayoutParams(blp);
+            android.widget.FrameLayout.LayoutParams vlp = (android.widget.FrameLayout.LayoutParams) videoControls.getLayoutParams();
+            vlp.width = dp(460);
+            videoControls.setLayoutParams(vlp);
         }
 
         video.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
@@ -192,7 +261,12 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
             public void onPrepared(MediaPlayer mp) {
                 mp.setLooping(true);
                 progress.setVisibility(View.GONE);
+                int length = video.getDuration();
+                seek.setMax(Math.max(0, length));
+                seek.setProgress(0);
+                durationText.setText(MainActivity.durationLabel(length));
                 video.start();
+                setPlayingUi(true);
             }
         });
         video.setOnErrorListener(new MediaPlayer.OnErrorListener() {
@@ -235,6 +309,12 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        if (seek != null) main.post(ticker);
+    }
+
+    @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putInt(EXTRA_INDEX, index);
@@ -243,16 +323,17 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     @Override
     protected void onPause() {
         super.onPause();
+        main.removeCallbacks(ticker);
         if (video != null && video.isPlaying()) {
             video.pause();
-            playState.setImageResource(R.drawable.ic_play);
-            playState.setVisibility(View.VISIBLE);
+            setPlayingUi(false);
         }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        main.removeCallbacks(ticker);
         if (video != null) video.stopPlayback();
         io.shutdownNow();
     }
@@ -273,6 +354,15 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         playState.setVisibility(View.GONE);
         video.stopPlayback();
         image.setImageDrawable(null);
+        prevBtn.setAlpha(index > 0 ? 1f : 0.3f);
+        prevBtn.setEnabled(index > 0);
+        nextBtn.setAlpha(index < items.size() - 1 ? 1f : 0.3f);
+        nextBtn.setEnabled(index < items.size() - 1);
+        seek.setProgress(0);
+        seek.setMax(0);
+        positionText.setText("0:00");
+        durationText.setText("0:00");
+        updateChrome();
 
         if (item.isVideo()) {
             image.setVisibility(View.GONE);
@@ -313,7 +403,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         actSave.setEnabled(!saved);
         actRepost.setVisibility(repostPackage != null ? View.VISIBLE : View.GONE);
         actFrame.setVisibility(item.isVideo() ? View.VISIBLE : View.GONE);
-        actDelete.setVisibility(isSavedSection || source != null ? View.VISIBLE : View.GONE);
+        actDelete.setVisibility(isSavedSection ? View.VISIBLE : View.GONE); // delete only for saved items
     }
 
     @Override
@@ -334,21 +424,55 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
 
     @Override
     public void onTap() {
-        StatusItem item = items.get(index);
-        if (item.isVideo() && video.getVisibility() == View.VISIBLE && progress.getVisibility() != View.VISIBLE) {
-            if (video.isPlaying()) {
-                video.pause();
-                playState.setImageResource(R.drawable.ic_play);
-                playState.setVisibility(View.VISIBLE);
-            } else {
-                video.start();
-                playState.setVisibility(View.GONE);
-            }
-            return;
-        }
         chromeVisible = !chromeVisible;
-        topBar.setVisibility(chromeVisible ? View.VISIBLE : View.GONE);
-        bottomBar.setVisibility(chromeVisible ? View.VISIBLE : View.GONE);
+        updateChrome();
+    }
+
+    /** Shows or hides the bars, arrows and video controls together, with a quick fade. */
+    private void updateChrome() {
+        boolean isVideo = items.get(index).isVideo();
+        fade(topBar, chromeVisible);
+        fade(bottomBar, chromeVisible);
+        fade(prevBtn, chromeVisible && items.size() > 1);
+        fade(nextBtn, chromeVisible && items.size() > 1);
+        fade(videoControls, chromeVisible && isVideo);
+    }
+
+    private void fade(final View v, final boolean show) {
+        v.animate().cancel();
+        if (show) {
+            if (v.getVisibility() != View.VISIBLE) {
+                v.setAlpha(0f);
+                v.setVisibility(View.VISIBLE);
+            }
+            float target = v == prevBtn ? (index > 0 ? 1f : 0.3f) : v == nextBtn ? (index < items.size() - 1 ? 1f : 0.3f) : 1f;
+            v.animate().alpha(target).setDuration(160).start();
+        } else if (v.getVisibility() == View.VISIBLE) {
+            v.animate().alpha(0f).setDuration(160).withEndAction(new Runnable() {
+                @Override
+                public void run() {
+                    v.setVisibility(View.GONE);
+                }
+            }).start();
+        }
+    }
+
+    private void togglePlay() {
+        if (video.getVisibility() != View.VISIBLE || progress.getVisibility() == View.VISIBLE) return;
+        if (video.isPlaying()) {
+            video.pause();
+            setPlayingUi(false);
+        } else {
+            video.start();
+            setPlayingUi(true);
+        }
+    }
+
+    private void setPlayingUi(boolean playing) {
+        playPause.setImageResource(playing ? R.drawable.ic_pause : R.drawable.ic_play);
+        playPause.setContentDescription(playing ? "Pause" : "Play");
+        playState.setImageResource(R.drawable.ic_play);
+        playState.setVisibility(playing ? View.GONE : View.VISIBLE);
     }
 
     // ---------------- Actions ----------------

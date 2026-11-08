@@ -79,6 +79,89 @@
             android:textSize="15sp" />
     </LinearLayout>
 
+    <!-- Previous / next status -->
+    <ImageButton
+        android:id="@+id/prev"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:layout_gravity="start|center_vertical"
+        android:layout_marginStart="10dp"
+        android:background="@drawable/bg_glass_circle"
+        android:contentDescription="Previous"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_chevron_left" />
+
+    <ImageButton
+        android:id="@+id/next"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:layout_gravity="end|center_vertical"
+        android:layout_marginEnd="10dp"
+        android:background="@drawable/bg_glass_circle"
+        android:contentDescription="Next"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
+        android:src="@drawable/ic_chevron_right" />
+
+    <!-- Video controls: play/pause, time, seek bar, length (videos only) -->
+    <LinearLayout
+        android:id="@+id/video_controls"
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="100dp"
+        android:background="@drawable/bg_viewer_capsule"
+        android:elevation="8dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingEnd="14dp"
+        android:visibility="gone">
+
+        <ImageButton
+            android:id="@+id/play_pause"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Pause"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_pause" />
+
+        <TextView
+            android:id="@+id/position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:fontFeatureSettings="tnum"
+            android:minWidth="34dp"
+            android:text="0:00"
+            android:textColor="#F2FFFFFF"
+            android:textSize="12sp" />
+
+        <SeekBar
+            android:id="@+id/seek"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp" />
+
+        <TextView
+            android:id="@+id/duration_total"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:fontFeatureSettings="tnum"
+            android:minWidth="34dp"
+            android:gravity="end"
+            android:text="0:00"
+            android:textColor="#B3FFFFFF"
+            android:textSize="12sp" />
+    </LinearLayout>
+
     <!-- Solid floating capsule so the actions stay readable over any photo.
          Actions are added in code with equal weights, so they fit any screen width. -->
     <LinearLayout

@@ -886,6 +886,7 @@ public class MainActivity extends BaseActivity {
         selAll.setText(selected.size() == visible.size() ? "Clear" : "Select all");
         boolean saved = section == Section.SAVED;
         actSave.setVisibility(saved ? View.GONE : View.VISIBLE);
+        actDelete.setVisibility(saved ? View.VISIBLE : View.GONE); // delete only for saved items
         actRepost.setVisibility(repostPackage() != null ? View.VISIBLE : View.GONE);
     }
 
