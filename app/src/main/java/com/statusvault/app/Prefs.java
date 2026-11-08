@@ -57,9 +57,22 @@ final class Prefs {
         if (s.addAll(names)) p.edit().putStringSet("seen", s).apply();
     }
 
+    // ---- saved copies the user deleted, so auto-save doesn't bring them back ----
+
+    Set<String> skipAutoSave() {
+        return new HashSet<>(p.getStringSet("skip_auto_save", new HashSet<String>()));
+    }
+
+    void addSkipAutoSave(Collection<String> names) {
+        Set<String> s = skipAutoSave();
+        if (s.addAll(names)) p.edit().putStringSet("skip_auto_save", s).apply();
+    }
+
     /** Forget statuses that no longer exist, so the set doesn't grow forever. */
     void pruneSeen(Set<String> present) {
         Set<String> s = seen();
         if (s.retainAll(present)) p.edit().putStringSet("seen", s).apply();
+        Set<String> skip = skipAutoSave();
+        if (skip.retainAll(present)) p.edit().putStringSet("skip_auto_save", skip).apply();
     }
 }

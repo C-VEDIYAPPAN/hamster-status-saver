@@ -5,7 +5,7 @@ Plain Java on the Android framework — **no libraries**, so the APK is under 10
 
 ## Install
 
-1. Copy `StatusVault-v1.2.apk` to your phone and open it.
+1. Copy `StatusVault-v1.3.apk` to your phone and open it.
 2. Allow "Install unknown apps" for your file manager or browser when Android asks.
 3. Open **Status Vault** → tap **Grant access** → on the folder screen tap **Use this folder → Allow**.
 
@@ -16,8 +16,9 @@ and WhatsApp deletes them after 24 hours.
 
 **Browse**
 - **WhatsApp / Business / Saved** sections with All · Photos · Videos filters, counts and total size
-- **NEW** badge on statuses you haven't opened yet
-- **Time-left** badge — roughly how long before WhatsApp deletes a status
+- Story-style **gradient ring** around statuses you haven't opened yet
+- **Expiry bar** on each tile — roughly how long before WhatsApp deletes it (turns red under 3h)
+- Video length on every video tile; one-tap **Save all** for unsaved statuses
 - Sort by newest, oldest or largest; 2–5 column grid
 
 **Act**
@@ -25,7 +26,8 @@ and WhatsApp deletes them after 24 hours.
 - **Repost to WhatsApp** — opens WhatsApp ready to post as your own status
 - **Grab a photo from a video** — pause anywhere and save that exact frame
 - Full-screen viewer: swipe between statuses, videos loop, tap to pause
-- Delete from Saved (Android asks to confirm for files saved before a reinstall)
+- **Delete** statuses or saved items, from the viewer or in bulk (always confirms first)
+- Floating glass tab bar that slides between sections and turns into an action bar while selecting
 
 **Automate & protect**
 - **Auto-save** every new status when you open the app

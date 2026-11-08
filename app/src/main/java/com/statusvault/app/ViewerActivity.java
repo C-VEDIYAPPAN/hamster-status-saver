@@ -49,10 +49,12 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     private static final String EXTRA_CAN_SAVE = "can_save";
     private static final String EXTRA_SAVED = "saved";
     private static final String EXTRA_REPOST_PKG = "repost_pkg";
+    private static final String EXTRA_SOURCE = "source";
     private static final int REQ_DELETE = 1;
+    private static final int REQ_REGRANT = 2;
 
     static Intent intent(Context context, List<StatusItem> items, int index, boolean isSavedSection,
-                         Collection<String> saved, String repostPackage, boolean canSave) {
+                         Collection<String> saved, String repostPackage, boolean canSave, StatusSource source) {
         int n = items.size();
         ArrayList<Uri> uris = new ArrayList<>(n);
         String[] names = new String[n];
@@ -77,6 +79,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                 .putExtra(EXTRA_IS_SAVED, isSavedSection)
                 .putExtra(EXTRA_CAN_SAVE, canSave)
                 .putExtra(EXTRA_REPOST_PKG, repostPackage)
+                .putExtra(EXTRA_SOURCE, source != null ? source.ordinal() : -1)
                 .putStringArrayListExtra(EXTRA_SAVED, new ArrayList<>(saved));
     }
 
@@ -89,6 +92,8 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     private final Set<String> savedNames = new HashSet<>();
     private boolean canSave, isSavedSection;
     private String repostPackage;
+    /** WhatsApp folder the items come from, or null for saved items. */
+    private StatusSource source;
     private int index;
     private int loadToken = 0;
     private boolean chromeVisible = true;
@@ -132,6 +137,8 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         canSave = in.getBooleanExtra(EXTRA_CAN_SAVE, false);
         isSavedSection = in.getBooleanExtra(EXTRA_IS_SAVED, false);
         repostPackage = in.getStringExtra(EXTRA_REPOST_PKG);
+        int src = in.getIntExtra(EXTRA_SOURCE, -1);
+        source = src >= 0 && src < StatusSource.values().length ? StatusSource.values()[src] : null;
         index = savedInstanceState != null
                 ? savedInstanceState.getInt(EXTRA_INDEX)
                 : in.getIntExtra(EXTRA_INDEX, 0);
@@ -168,7 +175,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
             public void run() { grabFrame(items.get(index)); }
         });
         actDelete = addAction(R.drawable.ic_delete, "Delete", false, new Runnable() {
-            public void run() { delete(items.get(index)); }
+            public void run() { confirmDelete(items.get(index)); }
         });
 
         video.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
@@ -296,7 +303,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         actSave.setEnabled(!saved);
         actRepost.setVisibility(repostPackage != null ? View.VISIBLE : View.GONE);
         actFrame.setVisibility(item.isVideo() ? View.VISIBLE : View.GONE);
-        actDelete.setVisibility(isSavedSection ? View.VISIBLE : View.GONE);
+        actDelete.setVisibility(isSavedSection || source != null ? View.VISIBLE : View.GONE);
     }
 
     @Override
@@ -418,12 +425,81 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         });
     }
 
+    private void confirmDelete(final StatusItem item) {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(source != null ? "Delete this status?" : "Delete this saved item?")
+                .setMessage(source != null
+                        ? "It'll be removed from this phone. A copy you've saved stays in your gallery."
+                        : "It'll be removed from your gallery.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Delete", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int which) {
+                        if (source != null) deleteStatus(item);
+                        else delete(item);
+                    }
+                })
+                .show()
+                .getButton(android.content.DialogInterface.BUTTON_POSITIVE).setTextColor(0xFFFFB4AB);
+    }
+
+    private void deleteStatus(final StatusItem item) {
+        io.execute(new Runnable() {
+            @Override
+            public void run() {
+                boolean regrant = false;
+                String err = null;
+                try {
+                    repo.deleteStatuses(Collections.singletonList(item));
+                } catch (SecurityException e) {
+                    regrant = true;
+                } catch (Exception e) {
+                    err = e.getMessage() != null ? e.getMessage() : "unknown error";
+                }
+                final boolean needsRegrant = regrant;
+                final String error = err;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isDestroyed()) return;
+                        if (needsRegrant) askToRegrant();
+                        else if (error != null) toast("Delete failed: " + error);
+                        else removeCurrent();
+                    }
+                });
+            }
+        });
+    }
+
+    /** Access granted before v1.3 is read-only; re-picking the folder adds permission to delete. */
+    private void askToRegrant() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Allow deleting")
+                .setMessage("To delete statuses, Status Vault needs to be allowed to change the " + source.label
+                        + " folder. The next screen opens it \u2014 tap \u201cUse this folder\u201d, then \u201cAllow\u201d.")
+                .setNegativeButton("Not now", null)
+                .setPositiveButton("Continue", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface d, int which) {
+                        Intent pick = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+                                .putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI, source.initialPickerUri());
+                        try {
+                            startActivityForResult(pick, REQ_REGRANT);
+                        } catch (android.content.ActivityNotFoundException e) {
+                            toast("This phone has no folder picker");
+                        }
+                    }
+                })
+                .show();
+    }
+
     private void delete(final StatusItem item) {
         io.execute(new Runnable() {
             @Override
             public void run() {
                 IntentSender sender = null;
                 String err = null;
+                prefs.addSkipAutoSave(Collections.singletonList(item.name));
                 try {
                     sender = repo.delete(Collections.singletonList(item));
                 } catch (Exception e) {
@@ -456,6 +532,18 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_DELETE && resultCode == RESULT_OK) removeCurrent();
+        if (requestCode == REQ_REGRANT && resultCode == RESULT_OK && data != null && data.getData() != null && source != null) {
+            if (!repo.isStatusFolder(data.getData())) {
+                toast("That isn't the .Statuses folder");
+                return;
+            }
+            try {
+                repo.grantAccess(source, data.getData());
+                deleteStatus(items.get(index)); // try again now that we can
+            } catch (SecurityException e) {
+                toast("Couldn't keep access to that folder");
+            }
+        }
     }
 
     private void removeCurrent() {

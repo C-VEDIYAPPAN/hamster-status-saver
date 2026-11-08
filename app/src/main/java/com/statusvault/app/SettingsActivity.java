@@ -167,7 +167,7 @@ public class SettingsActivity extends BaseActivity {
                 prefs.setSort(i);
             }
         }), segmentParams());
-        toggle(browsing, "Highlight new statuses", "A NEW badge on statuses you haven't opened",
+        toggle(browsing, "Highlight new statuses", "A story-style ring around statuses you haven't opened",
                 prefs.newBadges(), new Toggle() {
                     @Override
                     public void changed(Switch s, boolean on) {
@@ -175,7 +175,7 @@ public class SettingsActivity extends BaseActivity {
                         renderPreview();
                     }
                 });
-        toggle(browsing, "Show time left", "Countdown until WhatsApp deletes a status (estimated)",
+        toggle(browsing, "Show time left", "A bar showing how long until WhatsApp deletes a status (estimated)",
                 prefs.timeLeft(), new Toggle() {
                     @Override
                     public void changed(Switch s, boolean on) {
@@ -334,11 +334,11 @@ public class SettingsActivity extends BaseActivity {
         GradientDrawable bg = pal.rounded(getColor(R.color.surface), 20);
         bg.setStroke(dp(1), getColor(R.color.surface_variant));
         previewCard.setBackground(bg);
-        previewChipA.setTextColor(pal.onContainer);
-        previewChipA.setBackground(pal.rounded(pal.container, 14));
+        previewChipA.setTextColor(pal.onPrimary);
+        previewChipA.setBackground(pal.gradient(14));
         previewChipB.setBackground(pal.outlined(getColor(R.color.outline), 14));
         previewButton.setTextColor(pal.onPrimary);
-        previewButton.setBackground(pal.rounded(pal.primary, 18));
+        previewButton.setBackground(pal.gradient(18));
 
         // Restyle tiles in place (accent / badge changes)
         int cols = previewColumns();
@@ -371,31 +371,38 @@ public class SettingsActivity extends BaseActivity {
     }
 
     private void addPreviewTile(LinearLayout row, int i, boolean gap) {
-        int[] shades = {0x33, 0x22, 0x44, 0x2A, 0x3A};
-        FrameLayout tile = new FrameLayout(this);
-        tile.setBackground(pal.rounded((pal.primary & 0x00FFFFFF) | (shades[i % shades.length] << 24), 10));
-        if (prefs.newBadges() && i % 3 == 0) {
-            TextView pill = text("NEW", 9, 0, true);
-            pill.setTextColor(pal.onPrimary);
-            pill.setBackground(pal.rounded(pal.primary, 8));
-            pill.setPadding(dp(5), dp(1), dp(5), dp(1));
-            FrameLayout.LayoutParams pp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
-            pp.setMargins(dp(4), dp(4), 0, 0);
-            tile.addView(pill, pp);
+        int[] shades = {0x40, 0x2A, 0x50, 0x33, 0x46};
+        boolean isNew = prefs.newBadges() && i % 3 == 0;
+        // Outer frame = story ring for "new"; inner = the tile itself.
+        FrameLayout outer = new FrameLayout(this);
+        if (isNew) {
+            outer.setBackground(pal.gradient(13));
+            outer.setPadding(dp(2), dp(2), dp(2), dp(2));
         }
-        if (prefs.timeLeft() && i % 2 == 1) {
-            TextView t = text(Math.max(1, 23 - i * 2) + "h", 9, 0, false);
-            t.setTextColor(0xFFFFFFFF);
-            t.setBackground(pal.rounded(0x99000000, 8));
-            t.setPadding(dp(5), dp(1), dp(5), dp(1));
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START);
-            lp.setMargins(dp(4), 0, 0, dp(4));
-            tile.addView(t, lp);
+        FrameLayout tile = new FrameLayout(this);
+        tile.setBackground(pal.rounded((pal.primary & 0x00FFFFFF) | (shades[i % shades.length] << 24), 11));
+        outer.addView(tile, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+        if (prefs.timeLeft()) {
+            // Expiry bar along the bottom
+            FrameLayout track = new FrameLayout(this);
+            track.setBackground(pal.rounded(0x40FFFFFF, 2));
+            View fill = new View(this);
+            fill.setBackground(pal.rounded(pal.primary, 2));
+            float frac = 1f - (i % 5) * 0.18f;
+            fill.setPivotX(0);
+            fill.setScaleX(frac);
+            track.addView(fill, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(3), Gravity.BOTTOM);
+            tp.setMargins(dp(6), 0, dp(26), dp(8));
+            tile.addView(track, tp);
         }
         ImageView save = new ImageView(this);
         save.setImageResource(R.drawable.ic_download);
-        save.setImageTintList(ColorStateList.valueOf(pal.onContainer));
-        save.setBackground(Palette.oval(pal.container));
+        save.setImageTintList(ColorStateList.valueOf(0xFFFFFFFF));
+        GradientDrawable glassDot = Palette.oval(0x66000000);
+        glassDot.setStroke(dp(1), 0x40FFFFFF);
+        save.setBackground(glassDot);
         save.setPadding(dp(3), dp(3), dp(3), dp(3));
         FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.BOTTOM | Gravity.END);
         sp.setMargins(0, 0, dp(4), dp(4));
@@ -403,7 +410,7 @@ public class SettingsActivity extends BaseActivity {
 
         LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1);
         if (gap) tl.leftMargin = dp(6);
-        row.addView(tile, tl);
+        row.addView(outer, tl);
     }
 
     private void renderSwatches() {

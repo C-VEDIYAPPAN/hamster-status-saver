@@ -23,6 +23,10 @@ final class Palette {
     };
 
     final int primary, onPrimary, container, onContainer;
+    /** Second colour for gradients: the next accent in the list (teal → ocean, rose → amber, …). */
+    final int secondary;
+    /** Destructive actions (delete). */
+    final int error;
     final boolean dark;
     private final float density;
 
@@ -37,6 +41,9 @@ final class Palette {
         onPrimary = dark ? s[6] : 0xFFFFFFFF;
         container = dark ? s[4] : s[1];
         onContainer = dark ? s[5] : s[2];
+        int[] next = SETS[(clamp(accent) + 1) % SETS.length];
+        secondary = dark ? next[3] : next[0];
+        error = dark ? 0xFFFFB4AB : 0xFFBA1A1A;
         density = context.getResources().getDisplayMetrics().density;
     }
 
@@ -69,6 +76,39 @@ final class Palette {
         d.setStroke(Math.round(density), strokeColor);
         d.setCornerRadius(radiusDp * density);
         return d;
+    }
+
+    /** Diagonal accent gradient (story ring, selected stat card). */
+    GradientDrawable gradient(float radiusDp) {
+        GradientDrawable d = new GradientDrawable(GradientDrawable.Orientation.TL_BR, new int[]{primary, secondary});
+        d.setCornerRadius(radiusDp * density);
+        return d;
+    }
+
+    /** Frosted surface for floating elements: translucent fill with a hairline edge. */
+    GradientDrawable glass(int surfaceColor, float radiusDp) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor((surfaceColor & 0x00FFFFFF) | (dark ? 0xE6000000 : 0xF0000000));
+        d.setStroke(Math.max(1, Math.round(density)), dark ? 0x22FFFFFF : 0x14000000);
+        d.setCornerRadius(radiusDp * density);
+        return d;
+    }
+
+    /** Soft accent glow in the top corner of the screen, over the background colour. */
+    android.graphics.drawable.Drawable backgroundGlow(int bgColor, int widthPx) {
+        GradientDrawable base = new GradientDrawable();
+        base.setColor(bgColor);
+        GradientDrawable glow = new GradientDrawable();
+        glow.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        glow.setColors(new int[]{(primary & 0x00FFFFFF) | (dark ? 0x38000000 : 0x2A000000), (primary & 0x00FFFFFF)});
+        glow.setGradientCenter(0.9f, 0.0f);
+        glow.setGradientRadius(widthPx * 0.95f);
+        GradientDrawable glow2 = new GradientDrawable();
+        glow2.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        glow2.setColors(new int[]{(secondary & 0x00FFFFFF) | (dark ? 0x1C000000 : 0x14000000), (secondary & 0x00FFFFFF)});
+        glow2.setGradientCenter(0.0f, 0.35f);
+        glow2.setGradientRadius(widthPx * 0.8f);
+        return new android.graphics.drawable.LayerDrawable(new android.graphics.drawable.Drawable[]{base, glow, glow2});
     }
 
     static GradientDrawable oval(int color) {

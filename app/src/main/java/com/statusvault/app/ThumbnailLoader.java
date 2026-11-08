@@ -33,6 +33,31 @@ public final class ThumbnailLoader {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService pool = Executors.newFixedThreadPool(3);
     private final LruCache<String, Bitmap> cache;
+    /** Video durations by URI, in ms. */
+    private final java.util.concurrent.ConcurrentHashMap<String, Long> durations = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** Duration of a video already decoded by this loader, or -1. */
+    public long durationOf(StatusItem item) {
+        Long d = durations.get(item.uri.toString());
+        return d != null ? d : -1;
+    }
+
+    public interface DurationListener {
+        void onDuration(long ms);
+    }
+
+    private DurationListener pendingListenerFor(ImageView v) {
+        Object o = v.getTag(R.id.save);
+        return o instanceof DurationListener ? (DurationListener) o : null;
+    }
+
+    /** Like {@link #load}, and reports a video's duration once known. */
+    public void load(StatusItem item, ImageView view, int sizePx, DurationListener onDuration) {
+        view.setTag(R.id.save, onDuration);
+        long known = durationOf(item);
+        if (known >= 0 && onDuration != null) onDuration.onDuration(known);
+        load(item, view, sizePx);
+    }
 
     private ThumbnailLoader(Context context) {
         this.context = context;
@@ -66,6 +91,9 @@ public final class ThumbnailLoader {
                 main.post(new Runnable() {
                     @Override
                     public void run() {
+                        DurationListener dl = pendingListenerFor(view);
+                        long d = durationOf(item);
+                        if (dl != null && d >= 0 && key.equals(view.getTag(R.id.thumb))) dl.onDuration(d);
                         if (key.equals(view.getTag(R.id.thumb)) && bmp != null) {
                             view.setAlpha(0f);
                             view.setImageBitmap(bmp);
@@ -120,6 +148,11 @@ public final class ThumbnailLoader {
         MediaMetadataRetriever r = new MediaMetadataRetriever();
         try {
             r.setDataSource(context, uri);
+            try {
+                String d = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION);
+                if (d != null) durations.put(uri.toString(), Long.parseLong(d));
+            } catch (Exception ignored) {
+            }
             Bitmap frame;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                 frame = r.getScaledFrameAtTime(500_000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, maxPx, maxPx);

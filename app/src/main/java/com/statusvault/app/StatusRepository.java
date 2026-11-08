@@ -89,8 +89,24 @@ public final class StatusRepository {
         }
     }
 
+    /** True if the folder grant also allows deleting statuses (grants from v1.3 on). */
+    public boolean canDeleteStatuses(StatusSource source) {
+        Uri uri = accessUri(source);
+        if (uri == null) return false;
+        for (UriPermission p : resolver.getPersistedUriPermissions()) {
+            if (p.getUri().equals(uri) && p.isWritePermission()) return true;
+        }
+        return false;
+    }
+
     public void grantAccess(StatusSource source, Uri treeUri) {
-        resolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            // Read + write, so statuses can also be deleted from the app.
+            resolver.takePersistableUriPermission(treeUri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        } catch (SecurityException e) {
+            resolver.takePersistableUriPermission(treeUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        }
         prefs.edit().putString(source.prefKey(), treeUri.toString()).apply();
     }
 
@@ -270,6 +286,19 @@ public final class StatusRepository {
         return null;
     }
 
+    /**
+     * Deletes statuses from WhatsApp's .Statuses folder. Throws SecurityException if the folder
+     * grant is read-only (granted before v1.3) — the caller then asks the user to re-grant.
+     * Returns how many were deleted.
+     */
+    public int deleteStatuses(List<StatusItem> items) throws IOException {
+        int n = 0;
+        for (StatusItem item : items) {
+            if (DocumentsContract.deleteDocument(resolver, item.uri)) n++;
+        }
+        return n;
+    }
+
     /** Saves the video frame at [positionMs] as a JPEG in Pictures/StatusVault. Returns the file name. */
     public String saveVideoFrame(StatusItem item, long positionMs) throws IOException {
         MediaMetadataRetriever r = new MediaMetadataRetriever();
@@ -330,6 +359,7 @@ public final class StatusRepository {
     public int autoSaveNew() {
         Set<String> saved = new HashSet<>();
         for (StatusItem it : loadSaved()) saved.add(it.name);
+        saved.addAll(new Prefs(context).skipAutoSave()); // ones the user deleted on purpose
         int count = 0;
         for (StatusSource source : StatusSource.values()) {
             if (accessUri(source) == null) continue;

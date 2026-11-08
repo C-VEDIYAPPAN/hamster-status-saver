@@ -1,12 +1,16 @@
 package com.statusvault.app;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.content.res.ColorStateList;
+import android.graphics.Color;
+import android.graphics.Typeface;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -14,26 +18,26 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.DocumentsContract;
 import android.text.format.Formatter;
-import android.graphics.Color;
 import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsets;
 import android.view.animation.AlphaAnimation;
 import android.view.animation.AnimationSet;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.LayoutAnimationController;
+import android.view.animation.OvershootInterpolator;
 import android.view.animation.TranslateAnimation;
-import android.widget.FrameLayout;
-import android.widget.LinearLayout;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.GridView;
 import android.widget.ImageButton;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -63,13 +67,14 @@ public class MainActivity extends BaseActivity {
     private static final int REQ_DELETE = 300;
     private static final String KEY_SECTION = "section";
     private static final String KEY_FILTER = "filter";
+    private static final String[] SECTION_TITLES = {"WhatsApp", "Business", "Saved"};
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private StatusRepository repo;
     private Prefs prefs;
     private Palette palette;
-    private int appliedTheme;
+    private int appliedTheme, appliedColumns, appliedAccent;
 
     // State
     private Section section = Section.WHATSAPP;
@@ -81,28 +86,31 @@ public class MainActivity extends BaseActivity {
     private Set<String> seen = new HashSet<>();
     /** Selected items by URI; non-empty means selection mode. */
     private final Set<String> selected = new LinkedHashSet<>();
-    private boolean loadedOnce = false;
-    private boolean loading = false;
-    private boolean autoSaving = false;
+    private boolean loadedOnce, loading, autoSaving;
     private int loadGeneration = 0;
 
     // Views
-    private final View[] navPills = new View[3];
-    private final ImageView[] navIcons = new ImageView[3];
-    private final TextView[] navLabels = new TextView[3];
-    private final TextView[] navBadges = new TextView[3];
-    private LinearLayout nav;
-    private int appliedColumns;
-    /** Section the nav highlight currently shows (null until first drawn). */
-    private Section navSection;
-    private TextView chipAll, chipPhotos, chipVideos, stats, selCount;
-    private View filters, empty, header, selectionBar;
-    private View selSave, selRepost, selDelete;
+    private View root, header, selectionBar, empty, filtersRow;
+    private TextView title, subtitle, saveAll, selCount, selAll;
     private GridView grid;
     private ImageView emptyIcon;
     private TextView emptyTitle, emptyBody;
     private Button emptyAction;
     private ProgressBar progress;
+    private FrameLayout floatingBar;
+    private View navIndicator;
+    private LinearLayout navTabs, navActions;
+    private final View[] statCards = new View[3];
+    private final TextView[] statNumbers = new TextView[3];
+    private final TextView[] statLabels = new TextView[3];
+    private final ImageView[] navIcons = new ImageView[3];
+    private final TextView[] navLabels = new TextView[3];
+    private final TextView[] navBadges = new TextView[3];
+    private View actSave, actRepost, actShare, actDelete;
+    private Section indicatorAt;
+    private boolean barInSelectionMode;
+    private int bottomInset;
+
     private final StatusAdapter adapter = new StatusAdapter();
     private final List<StatusItem> visible = new ArrayList<>();
 
@@ -112,7 +120,10 @@ public class MainActivity extends BaseActivity {
         setContentView(R.layout.activity_main);
         repo = new StatusRepository(this);
         prefs = new Prefs(this);
+        palette = new Palette(this);
         appliedTheme = prefs.theme();
+        appliedColumns = prefs.columns();
+        appliedAccent = prefs.accent();
         for (Section s : Section.values()) items.put(s, new ArrayList<StatusItem>());
 
         if (savedInstanceState != null) {
@@ -121,49 +132,51 @@ public class MainActivity extends BaseActivity {
         }
         if (getIntent().getBooleanExtra(EXTRA_OPEN_SAVED, false)) section = Section.SAVED;
 
-        nav = (LinearLayout) findViewById(R.id.bottom_nav);
-        buildNav();
-        applyInsets();
-
-        chipAll = (TextView) findViewById(R.id.chip_all);
-        chipPhotos = (TextView) findViewById(R.id.chip_photos);
-        chipVideos = (TextView) findViewById(R.id.chip_videos);
-        bindChip(chipAll, Filter.ALL);
-        bindChip(chipPhotos, Filter.PHOTOS);
-        bindChip(chipVideos, Filter.VIDEOS);
-        stats = (TextView) findViewById(R.id.stats);
-
+        root = findViewById(R.id.root);
         header = findViewById(R.id.header);
         selectionBar = findViewById(R.id.selection_bar);
+        title = (TextView) findViewById(R.id.title);
+        subtitle = (TextView) findViewById(R.id.subtitle);
+        saveAll = (TextView) findViewById(R.id.save_all);
         selCount = (TextView) findViewById(R.id.sel_count);
-        selSave = findViewById(R.id.sel_save);
-        selRepost = findViewById(R.id.sel_repost);
-        selDelete = findViewById(R.id.sel_delete);
-        onClick(R.id.sel_close, new Runnable() { public void run() { clearSelection(); } });
-        onClick(R.id.sel_all, new Runnable() { public void run() { selectAll(); } });
-        onClick(R.id.sel_save, new Runnable() { public void run() { saveMany(selectedItems()); clearSelection(); } });
-        onClick(R.id.sel_repost, new Runnable() { public void run() { shareMany(selectedItems(), true); clearSelection(); } });
-        onClick(R.id.sel_share, new Runnable() { public void run() { shareMany(selectedItems(), false); clearSelection(); } });
-        onClick(R.id.sel_delete, new Runnable() { public void run() { deleteMany(selectedItems()); clearSelection(); } });
-        onClick(R.id.refresh, new Runnable() { public void run() { refresh(); } });
-        onClick(R.id.settings, new Runnable() {
-            public void run() {
-                startActivity(new Intent(MainActivity.this, SettingsActivity.class));
-            }
-        });
-
-        filters = findViewById(R.id.filters);
+        selAll = (TextView) findViewById(R.id.sel_all);
+        filtersRow = findViewById(R.id.filters);
         empty = findViewById(R.id.empty);
         emptyIcon = (ImageView) findViewById(R.id.empty_icon);
         emptyTitle = (TextView) findViewById(R.id.empty_title);
         emptyBody = (TextView) findViewById(R.id.empty_body);
         emptyAction = (Button) findViewById(R.id.empty_action);
         progress = (ProgressBar) findViewById(R.id.progress);
+        floatingBar = (FrameLayout) findViewById(R.id.floating_bar);
+        navIndicator = findViewById(R.id.nav_indicator);
+        navTabs = (LinearLayout) findViewById(R.id.nav_tabs);
+        navActions = (LinearLayout) findViewById(R.id.nav_actions);
+
+        onClick(R.id.refresh, new Runnable() { public void run() { refresh(); } });
+        onClick(R.id.settings, new Runnable() {
+            public void run() {
+                startActivity(new Intent(MainActivity.this, SettingsActivity.class));
+            }
+        });
+        onClick(R.id.sel_close, new Runnable() { public void run() { clearSelection(); } });
+        onClick(R.id.sel_all, new Runnable() { public void run() { selectAll(); } });
+        saveAll.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                List<StatusItem> unsaved = new ArrayList<>();
+                for (StatusItem it : items.get(section)) if (!savedNames.contains(it.name)) unsaved.add(it);
+                saveMany(unsaved);
+            }
+        });
+
+        buildStatCards();
+        buildFloatingBar();
 
         grid = (GridView) findViewById(R.id.grid);
         grid.setAdapter(adapter);
         grid.setLayoutAnimation(tileEntrance());
-        appliedColumns = prefs.columns();
+        applyInsets();
         grid.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -184,6 +197,7 @@ public class MainActivity extends BaseActivity {
                 && checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, REQ_LEGACY_STORAGE);
         }
+        applyColors();
         render();
     }
 
@@ -201,7 +215,12 @@ public class MainActivity extends BaseActivity {
             recreate();
             return;
         }
-        if (prefs.columns() != appliedColumns) { // grid size changed in Settings
+        if (prefs.accent() != appliedAccent) {
+            appliedAccent = prefs.accent();
+            palette = new Palette(this);
+            applyColors();
+        }
+        if (prefs.columns() != appliedColumns) {
             appliedColumns = prefs.columns();
             animateGrid();
         }
@@ -265,7 +284,6 @@ public class MainActivity extends BaseActivity {
                         for (StatusItem it : next.get(Section.SAVED)) savedNames.add(it.name);
                         loading = false;
                         loadedOnce = true;
-                        // Drop selections that no longer exist.
                         Set<String> all = new HashSet<>();
                         for (StatusItem it : items.get(section)) all.add(it.uri.toString());
                         selected.retainAll(all);
@@ -280,10 +298,11 @@ public class MainActivity extends BaseActivity {
     /** Settings → Auto-save: save anything new as soon as the app shows it. */
     private void maybeAutoSave() {
         if (!prefs.autoSave() || autoSaving) return;
+        Set<String> skip = prefs.skipAutoSave();
         boolean anyNew = false;
         for (Section s : new Section[]{Section.WHATSAPP, Section.BUSINESS}) {
             for (StatusItem it : items.get(s)) {
-                if (!savedNames.contains(it.name)) {
+                if (!savedNames.contains(it.name) && !skip.contains(it.name)) {
                     anyNew = true;
                     break;
                 }
@@ -312,50 +331,80 @@ public class MainActivity extends BaseActivity {
 
     // ---------------- Rendering ----------------
 
-    private void render() {
-        palette = new Palette(this);
+    /** Colours that depend on the accent: background glow, buttons, bar. */
+    private void applyColors() {
+        root.setBackground(palette.backgroundGlow(getColor(R.color.bg), getResources().getDisplayMetrics().widthPixels));
         progress.setIndeterminateTintList(ColorStateList.valueOf(palette.primary));
-        grid.setNumColumns(Math.max(2, Math.min(5, prefs.columns())));
+        floatingBar.setBackground(palette.glass(getColor(R.color.surface), 34));
+        navIndicator.setBackground(palette.gradient(27));
+        saveAll.setBackground(palette.rounded(palette.primary, 18));
+        saveAll.setTextColor(palette.onPrimary);
+        saveAll.setCompoundDrawableTintList(ColorStateList.valueOf(palette.onPrimary));
+        selAll.setBackground(palette.rounded(palette.container, 18));
+        selAll.setTextColor(palette.onContainer);
+        styleTabs();
+        styleActions();
+    }
 
-        styleNav(false);
+    private void render() {
+        grid.setNumColumns(Math.max(2, Math.min(5, prefs.columns())));
+        styleTabs();
+        moveIndicator(indicatorAt != null);
 
         List<StatusItem> all = sorted(items.get(section));
-        int photos = 0, videos = 0;
+        int photos = 0, videos = 0, fresh = 0, unsaved = 0;
         long bytes = 0;
         for (StatusItem it : all) {
             if (it.isVideo()) videos++; else photos++;
             bytes += it.size;
+            if (!seen.contains(it.name)) fresh++;
+            if (!savedNames.contains(it.name)) unsaved++;
         }
-        styleChip(chipAll, "All · " + all.size(), filter == Filter.ALL);
-        styleChip(chipPhotos, "Photos · " + photos, filter == Filter.PHOTOS);
-        styleChip(chipVideos, "Videos · " + videos, filter == Filter.VIDEOS);
-        stats.setText(all.isEmpty() ? "" : Formatter.formatShortFileSize(this, bytes));
+        StatusSource source = sourceOf(section);
+
+        // Large title + summary line
+        title.setText(SECTION_TITLES[section.ordinal()]);
+        StringBuilder sum = new StringBuilder();
+        if (source != null) {
+            sum.append(all.size()).append(all.size() == 1 ? " status" : " statuses");
+            if (prefs.newBadges() && fresh > 0) sum.append("  ·  ").append(fresh).append(" new");
+        } else {
+            sum.append(all.size()).append(" saved");
+        }
+        if (!all.isEmpty()) sum.append("  ·  ").append(Formatter.formatShortFileSize(this, bytes));
+        subtitle.setText(sum);
+        boolean showSaveAll = source != null && unsaved > 0 && Boolean.TRUE.equals(hasAccess.get(source));
+        saveAll.setVisibility(showSaveAll ? View.VISIBLE : View.GONE);
+        if (showSaveAll) saveAll.setText("Save all " + unsaved);
+
+        // Stat cards (also the filters)
+        int[] counts = {all.size(), photos, videos};
+        for (int i = 0; i < 3; i++) styleStatCard(i, counts[i], Filter.values()[i] == filter);
 
         visible.clear();
         for (StatusItem it : all) {
             if (filter == Filter.ALL || (filter == Filter.VIDEOS) == it.isVideo()) visible.add(it);
         }
         adapter.notifyDataSetChanged();
-        renderSelectionBar();
+        renderSelection();
 
         progress.setVisibility(loading && !loadedOnce ? View.VISIBLE : View.GONE);
         if (!loadedOnce) {
             empty.setVisibility(View.GONE);
             grid.setVisibility(View.VISIBLE);
-            filters.setVisibility(View.VISIBLE);
             return;
         }
 
-        StatusSource source = sourceOf(section);
         if (source != null && !Boolean.TRUE.equals(hasAccess.get(source))) {
-            filters.setVisibility(View.GONE);
+            filtersRow.setVisibility(View.GONE);
             grid.setVisibility(View.GONE);
+            subtitle.setText(Boolean.TRUE.equals(installed.get(source)) ? "Not connected yet" : "Not installed");
             if (!Boolean.TRUE.equals(installed.get(source))) {
                 showEmpty(R.drawable.ic_block, source.label + " isn't installed",
                         "Install it and view a few statuses, then come back here.", null, null);
             } else {
                 final StatusSource src = source;
-                showEmpty(R.drawable.ic_folder, "Allow access to " + source.label + " statuses",
+                showEmpty(R.drawable.ic_folder, "Connect " + source.label,
                         "Android only lets apps read statuses from a folder you pick. The next screen opens "
                                 + "in the right folder — just tap “Use this folder”, then “Allow”.",
                         "Grant access", new View.OnClickListener() {
@@ -368,11 +417,11 @@ public class MainActivity extends BaseActivity {
             return;
         }
 
-        filters.setVisibility(View.VISIBLE);
+        filtersRow.setVisibility(View.VISIBLE);
         if (visible.isEmpty()) {
             grid.setVisibility(View.GONE);
             if (source == null) {
-                showEmpty(R.drawable.ic_download, filter == Filter.ALL ? "Nothing saved yet" : "Nothing here",
+                showEmpty(R.drawable.ic_nav_saved, filter == Filter.ALL ? "Nothing saved yet" : "Nothing here",
                         "Tap the download button on any status to keep it in your gallery.", null, null);
             } else if (!all.isEmpty()) {
                 showEmpty(R.drawable.ic_photos, filter == Filter.VIDEOS ? "No videos" : "No photos",
@@ -404,22 +453,23 @@ public class MainActivity extends BaseActivity {
         return copy;
     }
 
-    private void showEmpty(int icon, String title, String body, String action, View.OnClickListener onAction) {
-        if (empty.getVisibility() != View.VISIBLE || !title.contentEquals(emptyTitle.getText())) {
+    private void showEmpty(int icon, String titleText, String body, String action, View.OnClickListener onAction) {
+        if (empty.getVisibility() != View.VISIBLE || !titleText.contentEquals(emptyTitle.getText())) {
             empty.setAlpha(0f);
-            empty.setTranslationY(dp(12));
-            empty.animate().alpha(1f).translationY(0).setDuration(220)
+            empty.setTranslationY(dp(14));
+            empty.animate().alpha(1f).translationY(0).setDuration(240)
                     .setInterpolator(new DecelerateInterpolator()).start();
         }
         empty.setVisibility(View.VISIBLE);
         emptyIcon.setImageResource(icon);
-        emptyIcon.setImageTintList(ColorStateList.valueOf(palette.primary));
-        emptyTitle.setText(title);
+        emptyIcon.setBackground(palette.gradient(36));
+        emptyIcon.setImageTintList(ColorStateList.valueOf(palette.onPrimary));
+        emptyTitle.setText(titleText);
         emptyBody.setText(body);
         if (action != null) {
             emptyAction.setVisibility(View.VISIBLE);
             emptyAction.setText(action);
-            emptyAction.setBackground(palette.rounded(palette.primary, 24));
+            emptyAction.setBackground(palette.gradient(26));
             emptyAction.setTextColor(palette.onPrimary);
             emptyAction.setOnClickListener(onAction);
         } else {
@@ -427,47 +477,80 @@ public class MainActivity extends BaseActivity {
         }
     }
 
-    private void bindChip(TextView chip, final Filter f) {
-        chip.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if (filter == f) return;
-                filter = f;
-                animateGrid();
-                render();
-            }
-        });
+    // ---------------- Stat cards (filters) ----------------
+
+    private void buildStatCards() {
+        LinearLayout row = (LinearLayout) filtersRow;
+        String[] labels = {"All", "Photos", "Videos"};
+        for (int i = 0; i < 3; i++) {
+            final Filter f = Filter.values()[i];
+            LinearLayout card = new LinearLayout(this);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setPadding(dp(14), dp(10), dp(12), dp(10));
+            TextView number = new TextView(this);
+            number.setTextSize(22);
+            number.setTypeface(Typeface.create("sans-serif-black", Typeface.NORMAL));
+            number.setIncludeFontPadding(false);
+            TextView label = new TextView(this);
+            label.setText(labels[i]);
+            label.setTextSize(12);
+            label.setPadding(0, dp(3), 0, 0);
+            card.addView(number);
+            card.addView(label);
+            card.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (filter == f) return;
+                    v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                    v.animate().scaleX(0.94f).scaleY(0.94f).setDuration(80).withEndAction(new Runnable() {
+                        @Override
+                        public void run() {
+                            statCardsSpring();
+                        }
+                    }).start();
+                    filter = f;
+                    animateGrid();
+                    render();
+                }
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+            if (i > 0) lp.leftMargin = dp(10);
+            row.addView(card, lp);
+            statCards[i] = card;
+            statNumbers[i] = number;
+            statLabels[i] = label;
+        }
     }
 
-    private void styleChip(TextView chip, String text, boolean isSelected) {
-        chip.setText(text);
-        chip.setBackground(isSelected ? palette.rounded(palette.container, 16)
-                : palette.outlined(getColor(R.color.outline), 16));
-        chip.setTextColor(isSelected ? palette.onContainer : getColor(R.color.on_surface));
+    private void statCardsSpring() {
+        for (View c : statCards) {
+            c.animate().scaleX(1f).scaleY(1f).setDuration(220).setInterpolator(new OvershootInterpolator(2f)).start();
+        }
     }
 
-    private void switchSection(Section s) {
-        if (section == s) return;
-        section = s;
-        selected.clear();
-        animateGrid();
-        styleNav(true);
-        render();
-        grid.setSelection(0);
+    private void styleStatCard(int i, int count, boolean isSelected) {
+        statNumbers[i].setText(String.valueOf(count));
+        if (isSelected) {
+            statCards[i].setBackground(palette.gradient(18));
+            statNumbers[i].setTextColor(palette.onPrimary);
+            statLabels[i].setTextColor((palette.onPrimary & 0x00FFFFFF) | 0xCC000000);
+        } else {
+            statCards[i].setBackground(palette.glass(getColor(R.color.surface), 18));
+            statNumbers[i].setTextColor(getColor(R.color.on_surface));
+            statLabels[i].setTextColor(getColor(R.color.on_surface_variant));
+        }
     }
 
-    // ---------------- Bottom navigation ----------------
+    // ---------------- Floating bar ----------------
 
-    private void buildNav() {
+    private void buildFloatingBar() {
         int[] icons = {R.drawable.ic_nav_chat, R.drawable.ic_nav_store, R.drawable.ic_nav_saved};
-        String[] labels = {"WhatsApp", "Business", "Saved"};
         for (int i = 0; i < 3; i++) {
             final Section s = Section.values()[i];
             LinearLayout item = new LinearLayout(this);
             item.setOrientation(LinearLayout.VERTICAL);
-            item.setGravity(Gravity.CENTER_HORIZONTAL);
-            item.setPadding(0, dp(10), 0, dp(12));
-            item.setContentDescription(labels[i]);
+            item.setGravity(Gravity.CENTER);
+            item.setContentDescription(SECTION_TITLES[i]);
             item.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -476,71 +559,86 @@ public class MainActivity extends BaseActivity {
                     else switchSection(s);
                 }
             });
-
             FrameLayout iconBox = new FrameLayout(this);
-            View pill = new View(this);
-            iconBox.addView(pill, new FrameLayout.LayoutParams(dp(64), dp(32), Gravity.CENTER));
+            iconBox.setClipChildren(false);
             ImageView icon = new ImageView(this);
             icon.setImageResource(icons[i]);
             iconBox.addView(icon, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
             TextView badge = new TextView(this);
             badge.setTextSize(10);
             badge.setGravity(Gravity.CENTER);
-            badge.setMinWidth(dp(18));
+            badge.setMinWidth(dp(17));
             badge.setPadding(dp(4), 0, dp(4), 0);
+            badge.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             badge.setVisibility(View.GONE);
-            FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(18), Gravity.TOP | Gravity.END);
-            bp.setMargins(0, dp(-2), dp(6), 0);
+            FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(17), Gravity.TOP | Gravity.END);
             iconBox.addView(badge, bp);
-            iconBox.setClipChildren(false);
-            item.addView(iconBox, new LinearLayout.LayoutParams(dp(64), dp(32)));
-
+            item.addView(iconBox, new LinearLayout.LayoutParams(dp(44), dp(28)));
             TextView label = new TextView(this);
-            label.setText(labels[i]);
-            label.setTextSize(12);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.topMargin = dp(4);
-            item.addView(label, lp);
-
-            nav.addView(item, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-            navPills[i] = pill;
+            label.setText(SECTION_TITLES[i]);
+            label.setTextSize(11);
+            label.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+            item.addView(label);
+            navTabs.addView(item, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1));
             navIcons[i] = icon;
             navLabels[i] = label;
             navBadges[i] = badge;
         }
-        nav.setClipChildren(false);
+        floatingBar.setClipChildren(false);
+
+        actSave = addBarAction(R.drawable.ic_download, "Save", new Runnable() {
+            public void run() { saveMany(selectedItems()); clearSelection(); }
+        });
+        actRepost = addBarAction(R.drawable.ic_repost, "Repost", new Runnable() {
+            public void run() { shareMany(selectedItems(), true); clearSelection(); }
+        });
+        actShare = addBarAction(R.drawable.ic_share, "Share", new Runnable() {
+            public void run() { shareMany(selectedItems(), false); clearSelection(); }
+        });
+        actDelete = addBarAction(R.drawable.ic_delete, "Delete", new Runnable() {
+            public void run() { confirmDelete(selectedItems(), sourceOf(section)); }
+        });
+
+        // Keep the sliding pill under the right tab when the bar is laid out or resized.
+        navTabs.addOnLayoutChangeListener(new View.OnLayoutChangeListener() {
+            @Override
+            public void onLayoutChange(View v, int l, int t, int r, int b, int ol, int ot, int or, int ob) {
+                if (r - l != or - ol) moveIndicator(false);
+            }
+        });
     }
 
-    /** Highlights the current section; the pill grows in when [animate] is true. */
-    private void styleNav(boolean animate) {
-        if (palette == null) palette = new Palette(this);
+    private View addBarAction(int icon, String label, final Runnable action) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setContentDescription(label);
+        ImageView iv = new ImageView(this);
+        iv.setImageResource(icon);
+        item.addView(iv, new LinearLayout.LayoutParams(dp(24), dp(24)));
+        TextView tv = new TextView(this);
+        tv.setText(label);
+        tv.setTextSize(11);
+        tv.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        tv.setPadding(0, dp(4), 0, 0);
+        item.addView(tv);
+        item.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                action.run();
+            }
+        });
+        navActions.addView(item, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1));
+        return item;
+    }
+
+    private void styleTabs() {
         for (int i = 0; i < 3; i++) {
             boolean sel = Section.values()[i] == section;
-            View pill = navPills[i];
-            pill.setBackground(palette.rounded(palette.container, 16));
-            if (navSection == section) {
-                // Highlight already in place (or animating) — leave it alone.
-            } else if (animate) {
-                pill.animate().cancel();
-                if (sel) {
-                    pill.setScaleX(0.4f);
-                    pill.setAlpha(0f);
-                    pill.animate().scaleX(1f).alpha(1f).setDuration(240)
-                            .setInterpolator(new DecelerateInterpolator(2f)).start();
-                } else {
-                    pill.animate().scaleX(0.4f).alpha(0f).setDuration(160).start();
-                }
-            } else {
-                pill.setScaleX(sel ? 1f : 0.4f);
-                pill.setAlpha(sel ? 1f : 0f);
-            }
-            navIcons[i].setImageTintList(ColorStateList.valueOf(
-                    sel ? palette.onContainer : getColor(R.color.on_surface_variant)));
-            navLabels[i].setTextColor(getColor(sel ? R.color.on_surface : R.color.on_surface_variant));
-            navLabels[i].setTypeface(android.graphics.Typeface.create(
-                    sel ? "sans-serif-medium" : "sans-serif", android.graphics.Typeface.NORMAL));
-
-            // Count of unopened statuses on the WhatsApp / Business tabs
+            int c = sel ? palette.onPrimary : getColor(R.color.on_surface_variant);
+            navIcons[i].setImageTintList(ColorStateList.valueOf(c));
+            navLabels[i].setTextColor(c);
             int fresh = 0;
             if (i < 2 && prefs.newBadges()) {
                 for (StatusItem it : items.get(Section.values()[i])) if (!seen.contains(it.name)) fresh++;
@@ -549,64 +647,132 @@ public class MainActivity extends BaseActivity {
             badge.setVisibility(fresh > 0 ? View.VISIBLE : View.GONE);
             if (fresh > 0) {
                 badge.setText(fresh > 99 ? "99+" : String.valueOf(fresh));
-                badge.setTextColor(palette.onPrimary);
-                badge.setBackground(palette.rounded(palette.primary, 9));
+                badge.setTextColor(sel ? palette.primary : palette.onPrimary);
+                badge.setBackground(palette.rounded(sel ? palette.onPrimary : palette.primary, 9));
             }
         }
-        navSection = section;
     }
 
-    // ---------------- Motion ----------------
+    private void styleActions() {
+        for (View v : new View[]{actSave, actRepost, actShare, actDelete}) {
+            int c = v == actDelete ? palette.error : getColor(R.color.on_surface);
+            LinearLayout item = (LinearLayout) v;
+            ((ImageView) item.getChildAt(0)).setImageTintList(ColorStateList.valueOf(c));
+            ((TextView) item.getChildAt(1)).setTextColor(c);
+        }
+    }
+
+    /** Slides the gradient pill under the selected tab. */
+    private void moveIndicator(boolean animate) {
+        int barWidth = navTabs.getWidth();
+        if (barWidth == 0) return;
+        int tabWidth = barWidth / 3;
+        int inset = dp(7);
+        int pillWidth = tabWidth - inset * 2;
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) navIndicator.getLayoutParams();
+        if (lp.width != pillWidth) {
+            lp.width = pillWidth;
+            navIndicator.setLayoutParams(lp);
+        }
+        float x = section.ordinal() * tabWidth + inset;
+        if (animate && indicatorAt != section) {
+            navIndicator.animate().translationX(x).setDuration(340)
+                    .setInterpolator(new OvershootInterpolator(1.1f)).start();
+        } else if (indicatorAt != section || !animate) {
+            navIndicator.animate().cancel();
+            navIndicator.setTranslationX(x);
+        }
+        indicatorAt = section;
+    }
+
+    /** Swaps the floating bar between tabs and selection actions with a quick crossfade. */
+    private void morphBar(final boolean selecting) {
+        if (selecting == barInSelectionMode) return;
+        barInSelectionMode = selecting;
+        final View out = selecting ? navTabs : navActions;
+        final View in = selecting ? navActions : navTabs;
+        navIndicator.animate().alpha(selecting ? 0f : 1f).setDuration(160).start();
+        out.animate().alpha(0f).translationY(dp(10)).setDuration(130).withEndAction(new Runnable() {
+            @Override
+            public void run() {
+                out.setVisibility(View.GONE);
+                in.setVisibility(View.VISIBLE);
+                in.setAlpha(0f);
+                in.setTranslationY(dp(10));
+                in.animate().alpha(1f).translationY(0).setDuration(200)
+                        .setInterpolator(new DecelerateInterpolator()).start();
+            }
+        }).start();
+        floatingBar.animate().scaleX(0.96f).scaleY(0.96f).setDuration(110).withEndAction(new Runnable() {
+            @Override
+            public void run() {
+                floatingBar.animate().scaleX(1f).scaleY(1f).setDuration(240)
+                        .setInterpolator(new OvershootInterpolator(2f)).start();
+            }
+        }).start();
+    }
+
+    private void switchSection(Section s) {
+        if (section == s) return;
+        section = s;
+        selected.clear();
+        animateGrid();
+        moveIndicator(true);
+        title.setAlpha(0f);
+        title.setTranslationX(dp(18));
+        title.animate().alpha(1f).translationX(0).setDuration(260).setInterpolator(new DecelerateInterpolator()).start();
+        render();
+        grid.setSelection(0);
+    }
+
+    // ---------------- Motion & insets ----------------
 
     /** Tiles fade and rise in, slightly staggered. */
     private LayoutAnimationController tileEntrance() {
         AnimationSet set = new AnimationSet(true);
-        AlphaAnimation fade = new AlphaAnimation(0f, 1f);
-        TranslateAnimation rise = new TranslateAnimation(0, 0, dp(16), 0);
-        set.addAnimation(fade);
-        set.addAnimation(rise);
-        set.setDuration(240);
+        set.addAnimation(new AlphaAnimation(0f, 1f));
+        set.addAnimation(new TranslateAnimation(0, 0, dp(18), 0));
+        set.setDuration(260);
         set.setInterpolator(new DecelerateInterpolator(1.5f));
-        LayoutAnimationController c = new LayoutAnimationController(set, 0.06f);
-        c.setOrder(LayoutAnimationController.ORDER_NORMAL);
-        return c;
+        return new LayoutAnimationController(set, 0.06f);
     }
 
     private void animateGrid() {
         grid.scheduleLayoutAnimation();
     }
 
-    /** Draws behind the system bars; the header gets the status-bar inset, the bottom bar the nav-bar inset. */
+    /** Draws edge-to-edge: the header clears the status bar, the floating bar clears the nav bar. */
     @SuppressWarnings("deprecation")
     private void applyInsets() {
-        final View root = findViewById(R.id.root);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                getWindow().setDecorFitsSystemWindows(false);
-            } else {
-                View decor = getWindow().getDecorView();
-                decor.setSystemUiVisibility(decor.getSystemUiVisibility()
-                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
-            }
-            getWindow().setStatusBarColor(Color.TRANSPARENT);
-            getWindow().setNavigationBarColor(Color.TRANSPARENT);
-            root.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
-                @Override
-                public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
-                    root.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
-                            insets.getSystemWindowInsetRight(), 0);
-                    nav.setPadding(0, 0, 0, insets.getSystemWindowInsetBottom());
-                    return insets;
-                }
-            });
-            root.requestApplyInsets();
+        final View column = findViewById(R.id.column);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            getWindow().setDecorFitsSystemWindows(false);
         } else {
-            // Android 8–9: keep classic bars, coloured to match the bottom bar.
-            root.setFitsSystemWindows(true);
-            getWindow().setNavigationBarColor(getColor(R.color.surface));
+            View decor = getWindow().getDecorView();
+            decor.setSystemUiVisibility(decor.getSystemUiVisibility()
+                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                    | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
         }
+        getWindow().setStatusBarColor(Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1
+                ? Color.TRANSPARENT : 0x66000000); // Android 8.0 can't draw dark nav icons
+        root.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+            @Override
+            public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                column.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                        insets.getSystemWindowInsetRight(), 0);
+                bottomInset = insets.getSystemWindowInsetBottom();
+                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) floatingBar.getLayoutParams();
+                lp.bottomMargin = bottomInset + dp(14);
+                floatingBar.setLayoutParams(lp);
+                // Let the grid scroll under the floating bar, but end above it.
+                grid.setPadding(grid.getPaddingLeft(), grid.getPaddingTop(), grid.getPaddingRight(),
+                        bottomInset + dp(14 + 68 + 18));
+                return insets;
+            }
+        });
+        root.requestApplyInsets();
     }
 
     // ---------------- Selection ----------------
@@ -616,7 +782,7 @@ public class MainActivity extends BaseActivity {
         String key = visible.get(position).uri.toString();
         if (!selected.remove(key)) selected.add(key);
         adapter.notifyDataSetChanged();
-        renderSelectionBar();
+        renderSelection();
     }
 
     private void selectAll() {
@@ -626,13 +792,13 @@ public class MainActivity extends BaseActivity {
             for (StatusItem it : visible) selected.add(it.uri.toString());
         }
         adapter.notifyDataSetChanged();
-        renderSelectionBar();
+        renderSelection();
     }
 
     private void clearSelection() {
         selected.clear();
         adapter.notifyDataSetChanged();
-        renderSelectionBar();
+        renderSelection();
     }
 
     private List<StatusItem> selectedItems() {
@@ -641,16 +807,26 @@ public class MainActivity extends BaseActivity {
         return out;
     }
 
-    private void renderSelectionBar() {
+    private void renderSelection() {
         boolean selecting = !selected.isEmpty();
-        header.setVisibility(selecting ? View.GONE : View.VISIBLE);
-        selectionBar.setVisibility(selecting ? View.VISIBLE : View.GONE);
+        if (selecting && header.getVisibility() == View.VISIBLE) {
+            header.setVisibility(View.INVISIBLE); // keep its height so nothing below jumps
+            selectionBar.setVisibility(View.VISIBLE);
+            selectionBar.setAlpha(0f);
+            selectionBar.animate().alpha(1f).setDuration(180).start();
+        } else if (!selecting && header.getVisibility() != View.VISIBLE) {
+            selectionBar.setVisibility(View.GONE);
+            header.setVisibility(View.VISIBLE);
+            header.setAlpha(0f);
+            header.animate().alpha(1f).setDuration(180).start();
+        }
+        morphBar(selecting);
         if (!selecting) return;
-        selCount.setText(selected.size() + " selected");
+        selCount.setText(String.valueOf(selected.size()) + " selected");
+        selAll.setText(selected.size() == visible.size() ? "Clear" : "Select all");
         boolean saved = section == Section.SAVED;
-        selSave.setVisibility(saved ? View.GONE : View.VISIBLE);
-        selDelete.setVisibility(saved ? View.VISIBLE : View.GONE);
-        selRepost.setVisibility(repostPackage() != null ? View.VISIBLE : View.GONE);
+        actSave.setVisibility(saved ? View.GONE : View.VISIBLE);
+        actRepost.setVisibility(repostPackage() != null ? View.VISIBLE : View.GONE);
     }
 
     // ---------------- Actions ----------------
@@ -810,8 +986,85 @@ public class MainActivity extends BaseActivity {
         }
     }
 
-    private void deleteMany(final List<StatusItem> list) {
+    /** Asks before deleting. [source] is null for the Saved tab. */
+    private void confirmDelete(final List<StatusItem> list, final StatusSource source) {
         if (list.isEmpty()) return;
+        int n = list.size();
+        String what = source != null ? (n == 1 ? "status" : n + " statuses") : (n == 1 ? "saved item" : n + " saved items");
+        String message = source != null
+                ? "They'll be removed from this phone. Copies you've saved stay in your gallery."
+                : "They'll be removed from your gallery.";
+        new AlertDialog.Builder(this)
+                .setTitle("Delete " + (n == 1 ? "this " : "") + what + "?")
+                .setMessage(message)
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Delete", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        clearSelection();
+                        if (source != null) deleteStatuses(list, source);
+                        else deleteSaved(list);
+                    }
+                })
+                .show()
+                .getButton(DialogInterface.BUTTON_POSITIVE).setTextColor(palette.error);
+    }
+
+    private void deleteStatuses(final List<StatusItem> list, final StatusSource source) {
+        io.execute(new Runnable() {
+            @Override
+            public void run() {
+                int done = 0;
+                boolean needsWrite = false;
+                String error = null;
+                try {
+                    done = repo.deleteStatuses(list);
+                } catch (SecurityException e) {
+                    needsWrite = true;
+                } catch (Exception e) {
+                    error = e.getMessage();
+                }
+                final int deleted = done;
+                final boolean regrant = needsWrite;
+                final String err = error;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (isDestroyed()) return;
+                        if (regrant) {
+                            askToRegrant(source);
+                        } else if (err != null && deleted == 0) {
+                            toast("Delete failed: " + err);
+                        } else {
+                            toast(deleted == 1 ? "Deleted" : "Deleted " + deleted + " statuses");
+                        }
+                        refresh();
+                    }
+                });
+            }
+        });
+    }
+
+    /** Folder access granted before v1.3 is read-only; one more tap in the picker adds delete. */
+    private void askToRegrant(final StatusSource source) {
+        new AlertDialog.Builder(this)
+                .setTitle("Allow deleting")
+                .setMessage("To delete statuses, Status Vault needs to be allowed to change the "
+                        + source.label + " folder. The next screen opens it — tap “Use this folder”, then “Allow”.")
+                .setNegativeButton("Not now", null)
+                .setPositiveButton("Continue", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface d, int which) {
+                        pickFolder(source);
+                    }
+                })
+                .show();
+    }
+
+    private void deleteSaved(final List<StatusItem> list) {
+        List<String> names = new ArrayList<>();
+        for (StatusItem it : list) names.add(it.name);
+        prefs.addSkipAutoSave(names); // don't let auto-save bring them back
         io.execute(new Runnable() {
             @Override
             public void run() {
@@ -851,7 +1104,7 @@ public class MainActivity extends BaseActivity {
         if (position < 0 || position >= visible.size()) return;
         StatusSource s = sourceOf(section);
         Intent intent = ViewerActivity.intent(this, visible, position, section == Section.SAVED,
-                savedNames, repostPackage(), s != null);
+                savedNames, repostPackage(), s != null, s);
         startActivity(intent);
     }
 
@@ -884,6 +1137,11 @@ public class MainActivity extends BaseActivity {
         return Math.max(1, minutes) + "m left";
     }
 
+    static String durationLabel(long ms) {
+        long s = Math.max(0, Math.round(ms / 1000.0));
+        return (s / 60) + ":" + (s % 60 < 10 ? "0" : "") + (s % 60);
+    }
+
     // ---------------- Grid ----------------
 
     private final class StatusAdapter extends BaseAdapter {
@@ -904,68 +1162,109 @@ public class MainActivity extends BaseActivity {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            View v = convertView != null ? convertView
-                    : LayoutInflater.from(MainActivity.this).inflate(R.layout.item_status, parent, false);
+            View v = convertView;
+            if (v == null) {
+                v = LayoutInflater.from(MainActivity.this).inflate(R.layout.item_status, parent, false);
+                v.findViewById(R.id.card).setClipToOutline(true);
+            }
             final StatusItem item = getItem(position);
+            View ring = v;
+            View card = v.findViewById(R.id.card);
             ImageView thumb = (ImageView) v.findViewById(R.id.thumb);
-            ImageView play = (ImageView) v.findViewById(R.id.play);
+            final TextView duration = (TextView) v.findViewById(R.id.duration);
+            TextView timeLeft = (TextView) v.findViewById(R.id.time_left);
             ImageButton saveBtn = (ImageButton) v.findViewById(R.id.save);
-            TextView badgeNew = (TextView) v.findViewById(R.id.badge_new);
-            TextView badgeTime = (TextView) v.findViewById(R.id.badge_time);
+            View track = v.findViewById(R.id.expiry_track);
+            View fill = v.findViewById(R.id.expiry_fill);
+            View bottomRow = v.findViewById(R.id.bottom_row);
             View overlay = v.findViewById(R.id.sel_overlay);
             ImageView check = (ImageView) v.findViewById(R.id.sel_check);
             saveBtn.setFocusable(false); // ImageButton forces focusable=true, which would block grid item clicks
 
-            // One size for every grid setting, so changing columns reuses cached thumbnails.
-            ThumbnailLoader.get(MainActivity.this).load(item, thumb, dp(240));
-            play.setVisibility(item.isVideo() ? View.VISIBLE : View.GONE);
-
             boolean isStatus = section != Section.SAVED;
             boolean selecting = !selected.isEmpty();
             boolean isSelected = selected.contains(item.uri.toString());
+            int cols = Math.max(2, Math.min(5, prefs.columns()));
+            boolean compact = cols >= 5;
 
-            // NEW badge
+            // Story-style ring on statuses you haven't opened
             boolean isNew = isStatus && prefs.newBadges() && !seen.contains(item.name);
-            badgeNew.setVisibility(isNew ? View.VISIBLE : View.GONE);
-            if (isNew) {
-                badgeNew.setBackground(palette.rounded(palette.primary, 10));
-                badgeNew.setTextColor(palette.onPrimary);
+            ring.setBackground(isNew ? palette.gradient(22) : null);
+            card.setBackground(palette.rounded(getColor(R.color.surface_variant), isNew ? 19 : 20));
+
+            // Thumbnail + duration (videos)
+            duration.setVisibility(View.GONE);
+            ThumbnailLoader.get(MainActivity.this).load(item, thumb, dp(240),
+                    item.isVideo() ? new ThumbnailLoader.DurationListener() {
+                        @Override
+                        public void onDuration(long ms) {
+                            duration.setText(durationLabel(ms));
+                            duration.setVisibility(View.VISIBLE);
+                        }
+                    } : null);
+            if (item.isVideo() && duration.getVisibility() != View.VISIBLE) {
+                duration.setText("");
+                duration.setVisibility(View.VISIBLE); // play glyph until the length is known
             }
 
-            // Time left before WhatsApp deletes it
+            // Time left + expiry bar
             long left = isStatus && prefs.timeLeft() ? item.millisLeft(System.currentTimeMillis()) : -1;
-            badgeTime.setVisibility(left > 0 && !selecting ? View.VISIBLE : View.GONE);
-            if (left > 0) badgeTime.setText(timeLeftLabel(left));
+            boolean showTime = left > 0 && !compact;
+            timeLeft.setText(showTime ? timeLeftLabel(left).replace(" left", "") : "");
+            track.setVisibility(left > 0 ? View.VISIBLE : View.GONE);
+            if (left > 0) {
+                float frac = Math.min(1f, left / (24f * 3600_000f));
+                fill.setPivotX(0);
+                fill.setScaleX(frac);
+                fill.setBackground(palette.rounded(left < 3 * 3600_000L ? palette.error : palette.primary, 2));
+            }
 
-            // Save button
+            // Save button: glass circle, or accent with a check once saved
             if (!isStatus || selecting) {
                 saveBtn.setVisibility(View.GONE);
             } else {
                 boolean saved = savedNames.contains(item.name);
                 saveBtn.setVisibility(View.VISIBLE);
-                saveBtn.setBackground(Palette.oval(palette.container));
-                saveBtn.setImageTintList(ColorStateList.valueOf(palette.onContainer));
+                if (saved) {
+                    saveBtn.setBackground(Palette.oval(palette.primary));
+                    saveBtn.setImageTintList(ColorStateList.valueOf(palette.onPrimary));
+                } else {
+                    android.graphics.drawable.GradientDrawable glass = Palette.oval(0x66000000);
+                    glass.setStroke(Math.max(1, dp(1)), 0x40FFFFFF);
+                    saveBtn.setBackground(glass);
+                    saveBtn.setImageTintList(ColorStateList.valueOf(Color.WHITE));
+                }
                 saveBtn.setImageResource(saved ? R.drawable.ic_done : R.drawable.ic_download);
                 saveBtn.setContentDescription(saved ? "Saved" : "Save");
                 saveBtn.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View view) {
+                        view.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                        view.animate().scaleX(0.8f).scaleY(0.8f).setDuration(70).withEndAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                // spring back, then the adapter refresh shows the check
+                            }
+                        }).start();
                         List<StatusItem> one = new ArrayList<>();
                         one.add(item);
                         saveMany(one);
                     }
                 });
+                saveBtn.setScaleX(1f);
+                saveBtn.setScaleY(1f);
             }
+            bottomRow.setVisibility(isStatus ? View.VISIBLE : View.GONE);
 
             // Selection state
             overlay.setVisibility(isSelected ? View.VISIBLE : View.GONE);
-            overlay.setBackgroundColor((palette.primary & 0x00FFFFFF) | 0x55000000);
+            overlay.setBackgroundColor((palette.primary & 0x00FFFFFF) | 0x59000000);
             check.setVisibility(selecting ? View.VISIBLE : View.GONE);
             check.setImageResource(isSelected ? R.drawable.ic_check_circle : R.drawable.ic_circle_outline);
-            check.setImageTintList(ColorStateList.valueOf(isSelected ? palette.primary : 0xFFFFFFFF));
-            check.setBackground(isSelected ? Palette.oval(0xFFFFFFFF) : null);
-            v.setScaleX(isSelected ? 0.94f : 1f);
-            v.setScaleY(isSelected ? 0.94f : 1f);
+            check.setImageTintList(ColorStateList.valueOf(isSelected ? palette.primary : Color.WHITE));
+            check.setBackground(isSelected ? Palette.oval(Color.WHITE) : null);
+            float scale = isSelected ? 0.92f : 1f;
+            if (v.getScaleX() != scale) v.animate().scaleX(scale).scaleY(scale).setDuration(160).start();
             return v;
         }
     }
