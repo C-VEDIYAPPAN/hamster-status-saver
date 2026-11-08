@@ -160,7 +160,97 @@
             android:text="0:00"
             android:textColor="#B3FFFFFF"
             android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/speed"
+            android:layout_width="wrap_content"
+            android:layout_height="22dp"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/bg_speed_pill"
+            android:contentDescription="Playback speed"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:minWidth="36dp"
+            android:paddingStart="6dp"
+            android:paddingEnd="6dp"
+            android:text="1x"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp" />
+
+        <ImageButton
+            android:id="@+id/mute"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_marginStart="4dp"
+            android:background="?android:attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Mute"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:src="@drawable/ic_volume_up" />
     </LinearLayout>
+
+    <!-- Frame preview that follows the finger while dragging the seek bar -->
+    <LinearLayout
+        android:id="@+id/scrub_preview"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginBottom="160dp"
+        android:background="@drawable/bg_scrub_card"
+        android:elevation="12dp"
+        android:gravity="center_horizontal"
+        android:orientation="vertical"
+        android:padding="4dp"
+        android:visibility="gone">
+
+        <ImageView
+            android:id="@+id/scrub_frame"
+            android:layout_width="96dp"
+            android:layout_height="170dp"
+            android:background="#000000"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter" />
+
+        <TextView
+            android:id="@+id/scrub_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="2dp"
+            android:fontFamily="sans-serif-medium"
+            android:fontFeatureSettings="tnum"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <!-- Double-tap skip bubbles -->
+    <TextView
+        android:id="@+id/skip_back"
+        android:layout_width="84dp"
+        android:layout_height="84dp"
+        android:layout_gravity="center_vertical|start"
+        android:layout_marginStart="56dp"
+        android:background="@drawable/bg_play_badge"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:text="« 5s"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/skip_forward"
+        android:layout_width="84dp"
+        android:layout_height="84dp"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="56dp"
+        android:background="@drawable/bg_play_badge"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:text="5s »"
+        android:textColor="#FFFFFF"
+        android:textSize="16sp"
+        android:visibility="gone" />
 
     <!-- Solid floating capsule so the actions stay readable over any photo.
          Actions are added in code with equal weights, so they fit any screen width. -->

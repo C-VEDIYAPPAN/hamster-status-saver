@@ -111,14 +111,26 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     private android.widget.SeekBar seek;
     private TextView positionText, durationText;
     private boolean userSeeking;
+    /** The VideoView's player, captured when prepared — needed for exact seeking, speed and volume. */
+    private MediaPlayer player;
+    private boolean seekPending, resumeAfterSeek, muted;
+    private static final float[] SPEEDS = {1f, 1.5f, 2f, 0.5f};
+    private int speedIndex = 0;
+    private long lastLiveSeek;
+    private int lastTickBucket = -1;
+    private ScrubFrames scrub;
+    private View scrubPreview, skipBack, skipForward;
+    private ImageView scrubFrame;
+    private TextView scrubTime, speedText;
+    private android.widget.ImageButton muteBtn;
     /** Moves the seek bar along while a video plays. */
     private final Runnable ticker = new Runnable() {
         @Override
         public void run() {
             if (video != null && video.getVisibility() == View.VISIBLE) {
                 int pos = video.getCurrentPosition();
-                if (!userSeeking) seek.setProgress(pos);
-                positionText.setText(MainActivity.durationLabel(pos));
+                if (!userSeeking && !seekPending) seek.setProgress(pos);
+                if (!userSeeking && !seekPending) positionText.setText(MainActivity.durationLabel(pos));
             }
             main.postDelayed(this, 250);
         }
@@ -203,21 +215,80 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         };
         playPause.setOnClickListener(toggle);
         playState.setOnClickListener(toggle);
+        scrub = new ScrubFrames(this);
+        scrubPreview = findViewById(R.id.scrub_preview);
+        scrubFrame = (ImageView) findViewById(R.id.scrub_frame);
+        scrubTime = (TextView) findViewById(R.id.scrub_time);
+        skipBack = findViewById(R.id.skip_back);
+        skipForward = findViewById(R.id.skip_forward);
+        speedText = (TextView) findViewById(R.id.speed);
+        muteBtn = (android.widget.ImageButton) findViewById(R.id.mute);
+        speedText.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                speedIndex = (speedIndex + 1) % SPEEDS.length;
+                updateSpeedLabel();
+                applySpeed();
+                toast(speedLabel() + " speed");
+            }
+        });
+        muteBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                muted = !muted;
+                applyVolume();
+            }
+        });
         seek.setOnSeekBarChangeListener(new android.widget.SeekBar.OnSeekBarChangeListener() {
             @Override
-            public void onProgressChanged(android.widget.SeekBar s, int progress, boolean fromUser) {
-                if (fromUser) positionText.setText(MainActivity.durationLabel(progress));
+            public void onProgressChanged(android.widget.SeekBar s, int ms, boolean fromUser) {
+                if (!fromUser) return;
+                positionText.setText(MainActivity.durationLabel(ms));
+                showScrubPreview(ms);
+                // Live scrubbing: move the video itself (fast keyframe seek, throttled)
+                long now = android.os.SystemClock.uptimeMillis();
+                if (now - lastLiveSeek > 120) {
+                    lastLiveSeek = now;
+                    seekTo(ms, MediaPlayer.SEEK_CLOSEST_SYNC);
+                }
+                // A light tick every 5 seconds of video
+                int bucket = ms / 5000;
+                if (bucket != lastTickBucket) {
+                    if (lastTickBucket >= 0) s.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
+                    lastTickBucket = bucket;
+                }
             }
 
             @Override
             public void onStartTrackingTouch(android.widget.SeekBar s) {
                 userSeeking = true;
+                lastTickBucket = s.getProgress() / 5000;
+                if (video.isPlaying()) video.pause(); // hold still while scrubbing
+                scrubPreview.animate().cancel();
+                scrubPreview.setAlpha(0f);
+                scrubPreview.setScaleX(0.85f);
+                scrubPreview.setScaleY(0.85f);
+                scrubPreview.setVisibility(View.VISIBLE);
+                scrubPreview.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(140).start();
+                showScrubPreview(s.getProgress());
             }
 
             @Override
             public void onStopTrackingTouch(android.widget.SeekBar s) {
                 userSeeking = false;
-                video.seekTo(s.getProgress());
+                scrubPreview.animate().alpha(0f).scaleX(0.85f).scaleY(0.85f).setDuration(120)
+                        .withEndAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                scrubPreview.setVisibility(View.GONE);
+                            }
+                        }).start();
+                // Exact seek to where the finger lifted, then play from there.
+                resumeAfterSeek = true;
+                setPlayingUi(true);
+                seekTo(s.getProgress(), MediaPlayer.SEEK_CLOSEST);
             }
         });
 
@@ -259,19 +330,36 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         video.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
             @Override
             public void onPrepared(MediaPlayer mp) {
+                player = mp;
                 mp.setLooping(true);
+                mp.setOnSeekCompleteListener(new MediaPlayer.OnSeekCompleteListener() {
+                    @Override
+                    public void onSeekComplete(MediaPlayer m) {
+                        if (userSeeking) return; // live scrubbing; the final seek comes on release
+                        seekPending = false;
+                        if (resumeAfterSeek) {
+                            resumeAfterSeek = false;
+                            video.start();
+                            applySpeed();
+                            setPlayingUi(true);
+                        }
+                    }
+                });
+                applyVolume();
                 progress.setVisibility(View.GONE);
                 int length = video.getDuration();
                 seek.setMax(Math.max(0, length));
                 seek.setProgress(0);
                 durationText.setText(MainActivity.durationLabel(length));
                 video.start();
+                applySpeed();
                 setPlayingUi(true);
             }
         });
         video.setOnErrorListener(new MediaPlayer.OnErrorListener() {
             @Override
             public boolean onError(MediaPlayer mp, int what, int extra) {
+                player = null;
                 progress.setVisibility(View.GONE);
                 toast("Can't play this video");
                 return true;
@@ -324,6 +412,8 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     protected void onPause() {
         super.onPause();
         main.removeCallbacks(ticker);
+        if (scrubPreview != null) scrubPreview.setVisibility(View.GONE);
+        userSeeking = false;
         if (video != null && video.isPlaying()) {
             video.pause();
             setPlayingUi(false);
@@ -334,6 +424,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     protected void onDestroy() {
         super.onDestroy();
         main.removeCallbacks(ticker);
+        if (scrub != null) scrub.release();
         if (video != null) video.stopPlayback();
         io.shutdownNow();
     }
@@ -358,6 +449,13 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         prevBtn.setEnabled(index > 0);
         nextBtn.setAlpha(index < items.size() - 1 ? 1f : 0.3f);
         nextBtn.setEnabled(index < items.size() - 1);
+        player = null;
+        seekPending = false;
+        resumeAfterSeek = false;
+        userSeeking = false;
+        scrubPreview.setVisibility(View.GONE);
+        scrubFrame.setImageDrawable(null);
+        scrub.setVideo(item.isVideo() ? item.uri : null);
         seek.setProgress(0);
         seek.setMax(0);
         positionText.setText("0:00");
@@ -464,8 +562,122 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
             setPlayingUi(false);
         } else {
             video.start();
+            applySpeed();
             setPlayingUi(true);
         }
+    }
+
+    // ---------------- Player helpers ----------------
+
+    /** Seeks precisely (SEEK_CLOSEST) or quickly (SEEK_CLOSEST_SYNC); falls back to VideoView's seek. */
+    private void seekTo(int ms, int mode) {
+        seekPending = true;
+        try {
+            if (player != null) {
+                player.seekTo((long) ms, mode);
+                return;
+            }
+        } catch (IllegalStateException ignored) {
+        }
+        video.seekTo(ms);
+        if (!userSeeking) {
+            seekPending = false;
+            if (resumeAfterSeek) {
+                resumeAfterSeek = false;
+                video.start();
+            }
+        }
+    }
+
+    private String speedLabel() {
+        float sp = SPEEDS[speedIndex];
+        return (sp == Math.floor(sp) ? String.valueOf((int) sp) : String.valueOf(sp)) + "x";
+    }
+
+    private void updateSpeedLabel() {
+        speedText.setText(speedLabel());
+        boolean normal = SPEEDS[speedIndex] == 1f;
+        speedText.setTextColor(normal ? 0xFFFFFFFF : onAccent);
+        speedText.setBackground(normal ? getDrawable(R.drawable.bg_speed_pill) : Palette.oval(accent));
+        if (!normal) {
+            android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+            d.setColor(accent);
+            d.setCornerRadius(dp(10));
+            speedText.setBackground(d);
+        }
+    }
+
+    /** Applies the chosen speed — only while playing, since setting it on a paused player starts playback. */
+    private void applySpeed() {
+        if (player == null || !video.isPlaying()) return;
+        try {
+            player.setPlaybackParams(player.getPlaybackParams().setSpeed(SPEEDS[speedIndex]));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void applyVolume() {
+        muteBtn.setImageResource(muted ? R.drawable.ic_volume_off : R.drawable.ic_volume_up);
+        muteBtn.setContentDescription(muted ? "Unmute" : "Mute");
+        if (player == null) return;
+        try {
+            player.setVolume(muted ? 0f : 1f, muted ? 0f : 1f);
+        } catch (IllegalStateException ignored) {
+        }
+    }
+
+    /** Positions the frame preview above the seek-bar thumb and loads the exact frame. */
+    private void showScrubPreview(int ms) {
+        scrubTime.setText(MainActivity.durationLabel(ms) + " / " + MainActivity.durationLabel(seek.getMax()));
+        int max = Math.max(1, seek.getMax());
+        float track = seek.getWidth() - seek.getPaddingLeft() - seek.getPaddingRight();
+        float thumbX = videoControls.getLeft() + seek.getLeft() + seek.getPaddingLeft() + track * ms / max;
+        int w = scrubPreview.getWidth() > 0 ? scrubPreview.getWidth() : dp(104);
+        View parent = (View) scrubPreview.getParent();
+        float left = Math.max(dp(8), Math.min(thumbX - w / 2f, parent.getWidth() - w - dp(8)));
+        scrubPreview.setTranslationX(left - scrubPreview.getLeft());
+        scrub.request(ms, dp(220), new ScrubFrames.Callback() {
+            @Override
+            public void onFrame(long timeMs, Bitmap frame) {
+                if (userSeeking) scrubFrame.setImageBitmap(frame);
+            }
+        });
+    }
+
+    @Override
+    public void onDoubleTap(boolean rightSide) {
+        StatusItem item = items.get(index);
+        if (!item.isVideo() || player == null || progress.getVisibility() == View.VISIBLE) return;
+        int length = Math.max(0, seek.getMax());
+        int target = Math.max(0, Math.min(length, video.getCurrentPosition() + (rightSide ? 5000 : -5000)));
+        resumeAfterSeek = video.isPlaying();
+        seek.setProgress(target);
+        positionText.setText(MainActivity.durationLabel(target));
+        seekTo(target, MediaPlayer.SEEK_CLOSEST);
+        root().performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+        final View bubble = rightSide ? skipForward : skipBack;
+        bubble.animate().cancel();
+        bubble.setVisibility(View.VISIBLE);
+        bubble.setAlpha(0f);
+        bubble.setScaleX(0.6f);
+        bubble.setScaleY(0.6f);
+        bubble.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(150).withEndAction(new Runnable() {
+            @Override
+            public void run() {
+                bubble.animate().alpha(0f).scaleX(1.15f).scaleY(1.15f).setStartDelay(250).setDuration(250)
+                        .withEndAction(new Runnable() {
+                            @Override
+                            public void run() {
+                                bubble.setVisibility(View.GONE);
+                                bubble.animate().setStartDelay(0);
+                            }
+                        }).start();
+            }
+        }).start();
+    }
+
+    private View root() {
+        return findViewById(R.id.root);
     }
 
     private void setPlayingUi(boolean playing) {

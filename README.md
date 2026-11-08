@@ -5,7 +5,7 @@ Plain Java on the Android framework — **no libraries**, so the APK is under 10
 
 ## Install
 
-1. Copy `StatusVault-v2.0.apk` to your phone and open it.
+1. Copy `StatusVault-v2.1.apk` to your phone and open it.
 2. Allow "Install unknown apps" for your file manager or browser when Android asks.
 3. Open **Status Vault** → tap **Grant access** → on the folder screen tap **Use this folder → Allow**.
 
@@ -25,7 +25,8 @@ and WhatsApp deletes them after 24 hours.
 - **Multi-select** — long-press, then save, share or repost many at once (delete on the Saved tab)
 - **Repost to WhatsApp** — opens WhatsApp ready to post as your own status
 - **Grab a photo from a video** — pause anywhere and save that exact frame
-- Full-screen viewer: next / previous buttons (or swipe), video player with play/pause, seek bar and time; tap to hide controls
+- Full-screen viewer: next / previous buttons (or swipe); tap to hide controls
+- **Video player**: frame-accurate seeking that plays from where you let go, a live frame preview above the seek bar while dragging, double-tap left/right to skip 5s, speed (0.5x–2x), mute
 - **Delete** saved items, from the viewer or in bulk (always confirms first)
 - Floating glass tab bar with a breathing accent glow that slides between sections and turns into an action bar while selecting
 

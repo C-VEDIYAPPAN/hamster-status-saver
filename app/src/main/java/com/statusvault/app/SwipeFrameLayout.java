@@ -13,6 +13,9 @@ public class SwipeFrameLayout extends FrameLayout {
         void onSwipeNext();
         void onSwipePrevious();
         void onTap();
+
+        /** Double tap; [rightSide] is true for the right half of the screen. */
+        void onDoubleTap(boolean rightSide);
     }
 
     private Listener listener;
@@ -27,8 +30,14 @@ public class SwipeFrameLayout extends FrameLayout {
             }
 
             @Override
-            public boolean onSingleTapUp(MotionEvent e) {
+            public boolean onSingleTapConfirmed(MotionEvent e) {
                 if (listener != null) listener.onTap();
+                return true;
+            }
+
+            @Override
+            public boolean onDoubleTap(MotionEvent e) {
+                if (listener != null) listener.onDoubleTap(e.getX() > getWidth() / 2f);
                 return true;
             }
 
@@ -55,7 +64,7 @@ public class SwipeFrameLayout extends FrameLayout {
 
     /** Taps on the bars' buttons should not count as "tap on media". */
     private boolean isOnClickableChild(MotionEvent ev) {
-        int[] ids = {R.id.top_bar, R.id.bottom_bar, R.id.video_controls, R.id.prev, R.id.next, R.id.play_state};
+        int[] ids = {R.id.top_bar, R.id.bottom_bar, R.id.video_controls, R.id.prev, R.id.next, R.id.play_state, R.id.scrub_preview};
         for (int id : ids) {
             android.view.View v = findViewById(id);
             if (v != null && v.getVisibility() == VISIBLE && v.getAlpha() > 0.1f
