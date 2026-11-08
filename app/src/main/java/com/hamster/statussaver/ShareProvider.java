@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.content.ContentProvider;
 import android.content.ContentValues;
@@ -21,7 +21,7 @@ import java.util.Locale;
  */
 public class ShareProvider extends ContentProvider {
 
-    static final String AUTHORITY = "com.statusvault.app.share";
+    static final String AUTHORITY = "com.hamster.statussaver.share";
 
     static File shareDir(Context context) {
         File dir = new File(context.getCacheDir(), "shared");

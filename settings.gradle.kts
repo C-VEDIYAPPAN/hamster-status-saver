@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "StatusVault"
+rootProject.name = "Hamster"
 include(":app")

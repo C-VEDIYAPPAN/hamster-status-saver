@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -14,6 +14,6 @@ public class UpdatedReceiver extends BroadcastReceiver {
         new Prefs(c).setLatestVersion(null);
         Updater.schedule(c);
         AutoSaveJob.sync(c);
-        Updater.notifyText(c, "Status Vault updated to " + Updater.currentVersion(c), "You're on the latest version.", null);
+        Updater.notifyText(c, "Hamster updated to " + Updater.currentVersion(c), "You're on the latest version.", null);
     }
 }

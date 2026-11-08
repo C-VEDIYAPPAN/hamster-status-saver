@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.app.Activity;
 import android.app.Application;
@@ -12,9 +12,9 @@ import android.view.WindowManager;
  * App lock coordinator: shows the lock screen when the app returns to the foreground,
  * and hides the app's content from the recent-apps screen while App lock is on.
  */
-public class StatusVaultApp extends Application implements Application.ActivityLifecycleCallbacks {
+public class HamsterApp extends Application implements Application.ActivityLifecycleCallbacks {
 
-    private static StatusVaultApp instance;
+    private static HamsterApp instance;
 
     private int started = 0;
     private boolean inBackground = true;
@@ -25,7 +25,7 @@ public class StatusVaultApp extends Application implements Application.ActivityL
     /** True while a LockActivity exists, so a second one is never stacked on top. */
     private boolean lockShowing = false;
 
-    static StatusVaultApp get() {
+    static HamsterApp get() {
         return instance;
     }
 

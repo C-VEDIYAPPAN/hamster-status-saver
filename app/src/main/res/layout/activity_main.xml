@@ -45,7 +45,7 @@
                         android:layout_weight="1"
                         android:fontFamily="sans-serif-medium"
                         android:letterSpacing="0.14"
-                        android:text="STATUS VAULT"
+                        android:text="HAMSTER"
                         android:textColor="@color/on_surface_variant"
                         android:textSize="12sp" />
 
@@ -246,7 +246,7 @@
     </LinearLayout>
 
     <!-- Breathing accent glow under the floating bar (size/position set in code) -->
-    <com.statusvault.app.GlowView
+    <com.hamster.statussaver.GlowView
         android:id="@+id/bar_glow"
         android:layout_width="0dp"
         android:layout_height="0dp"

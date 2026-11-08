@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.Manifest;
 import android.app.KeyguardManager;
@@ -265,7 +265,7 @@ public class SettingsActivity extends BaseActivity {
         // ---- Privacy ----
         section("Privacy");
         LinearLayout privacy = card();
-        toggle(privacy, "App lock", "Fingerprint, face or screen lock to open Status Vault. Also hides it in recent apps.",
+        toggle(privacy, "App lock", "Fingerprint, face or screen lock to open Hamster. Also hides it in recent apps.",
                 prefs.appLock(), new Toggle() {
                     @Override
                     public void changed(ToggleSwitch s, boolean on) {
@@ -276,10 +276,10 @@ public class SettingsActivity extends BaseActivity {
                                 notice.show("Set a screen lock on your phone first", Notice.ERROR);
                                 return;
                             }
-                            StatusVaultApp.get().markUnlocked(); // don't lock the user out right now
+                            HamsterApp.get().markUnlocked(); // don't lock the user out right now
                         }
                         prefs.setAppLock(on);
-                        StatusVaultApp.applyRecentsPrivacy(SettingsActivity.this);
+                        HamsterApp.applyRecentsPrivacy(SettingsActivity.this);
                         lockDelayGroup.setAlpha(on ? 1f : 0.45f);
                         if (on) notice.show("App lock is on", Notice.SUCCESS);
                     }
@@ -336,7 +336,7 @@ public class SettingsActivity extends BaseActivity {
             version = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
         } catch (PackageManager.NameNotFoundException ignored) {
         }
-        TextView ver = text("Status Vault " + version, 16, R.color.on_surface, false);
+        TextView ver = text("Hamster " + version, 16, R.color.on_surface, false);
         ver.setPadding(0, dp(6), 0, dp(2));
         about.addView(ver);
         TextView note = text("Only save statuses you have permission to keep.", 13, R.color.on_surface_variant, false);
@@ -346,7 +346,7 @@ public class SettingsActivity extends BaseActivity {
             public void run() {
                 try {
                     startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
-                            android.net.Uri.parse("https://github.com/C-VEDIYAPPAN/StatusVault")));
+                            android.net.Uri.parse("https://github.com/C-VEDIYAPPAN/hamster-status-saver")));
                 } catch (android.content.ActivityNotFoundException e) {
                     notice.show("No browser found", Notice.ERROR);
                 }
@@ -371,7 +371,7 @@ public class SettingsActivity extends BaseActivity {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(0, dp(8), 0, dp(8));
-        row.addView(text("Status Vault " + Updater.currentVersion(this), 16, R.color.on_surface, false),
+        row.addView(text("Hamster " + Updater.currentVersion(this), 16, R.color.on_surface, false),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         updateStatus = text("", 14, R.color.on_surface_variant, false);
         row.addView(updateStatus);
@@ -476,7 +476,7 @@ public class SettingsActivity extends BaseActivity {
                     public void onClick(android.content.DialogInterface di, int which) {
                         prefs.resetSettings();
                         AutoSaveJob.sync(SettingsActivity.this);
-                        StatusVaultApp.applyRecentsPrivacy(SettingsActivity.this);
+                        HamsterApp.applyRecentsPrivacy(SettingsActivity.this);
                         MainActivity.recreateInBackground();
                         android.util.DisplayMetrics m = getResources().getDisplayMetrics();
                         ThemeTransition.capture(SettingsActivity.this, m.widthPixels / 2f, m.heightPixels / 2f);

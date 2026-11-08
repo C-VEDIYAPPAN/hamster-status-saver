@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.Manifest;
 import android.app.Notification;

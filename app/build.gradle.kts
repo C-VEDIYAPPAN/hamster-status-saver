@@ -3,15 +3,15 @@ plugins {
 }
 
 android {
-    namespace = "com.statusvault.app"
+    namespace = "com.hamster.statussaver"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.statusvault.app"
+        applicationId = "com.hamster.statussaver"
         minSdk = 26
         targetSdk = 35
-        versionCode = 20
-        versionName = "2.9"
+        versionCode = 21
+        versionName = "3.0"
     }
 
     // signing/statusvault.jks is git-ignored. CI restores it from the KEYSTORE_BASE64 secret.

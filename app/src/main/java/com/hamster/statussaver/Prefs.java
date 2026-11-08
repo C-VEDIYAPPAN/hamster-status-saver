@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.content.Context;
 import android.content.SharedPreferences;

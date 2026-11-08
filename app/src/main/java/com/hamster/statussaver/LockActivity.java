@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.app.KeyguardManager;
 import android.content.Intent;
@@ -31,7 +31,7 @@ public class LockActivity extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        StatusVaultApp.get().setLockShowing(true);
+        HamsterApp.get().setLockShowing(true);
         Palette pal = new Palette(this);
 
         LinearLayout root = new LinearLayout(this);
@@ -53,7 +53,7 @@ public class LockActivity extends BaseActivity {
         root.addView(lock, lp);
 
         TextView title = new TextView(this);
-        title.setText("Status Vault is locked");
+        title.setText("Hamster is locked");
         title.setTextSize(20);
         title.setTextColor(getColor(R.color.on_surface));
         title.setGravity(Gravity.CENTER);
@@ -108,7 +108,7 @@ public class LockActivity extends BaseActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 BiometricPrompt.Builder b = new BiometricPrompt.Builder(this)
-                        .setTitle("Unlock Status Vault")
+                        .setTitle("Unlock Hamster")
                         .setSubtitle("Use your fingerprint, face or screen lock");
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     b.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK
@@ -149,13 +149,13 @@ public class LockActivity extends BaseActivity {
     @SuppressWarnings("deprecation")
     private void useScreenLock() {
         KeyguardManager km = getSystemService(KeyguardManager.class);
-        Intent i = km != null ? km.createConfirmDeviceCredentialIntent("Unlock Status Vault", "Confirm your screen lock") : null;
+        Intent i = km != null ? km.createConfirmDeviceCredentialIntent("Unlock Hamster", "Confirm your screen lock") : null;
         if (i == null) {
             unlocked();
             return;
         }
         authInProgress = true;
-        StatusVaultApp.get().suppressNextLockCheck();
+        HamsterApp.get().suppressNextLockCheck();
         try {
             startActivityForResult(i, REQ_CONFIRM);
         } catch (RuntimeException e) {
@@ -174,7 +174,7 @@ public class LockActivity extends BaseActivity {
     }
 
     private void unlocked() {
-        StatusVaultApp.get().markUnlocked();
+        HamsterApp.get().markUnlocked();
         finish();
         overridePendingTransition(0, android.R.anim.fade_out);
     }
@@ -189,7 +189,7 @@ public class LockActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        StatusVaultApp.get().setLockShowing(false);
+        HamsterApp.get().setLockShowing(false);
         if (cancel != null) cancel.cancel();
     }
 }

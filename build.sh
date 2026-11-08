@@ -9,8 +9,8 @@ cd "$(dirname "$0")"
 ANDROID_JAR=${ANDROID_JAR:-/opt/asdk/android.jar}          # compile Java against API 35
 RES_JAR=${RES_JAR:-$ANDROID_JAR}                          # link resources (older aapt2 needs API <= 34)
 DX=${DX:-$(command -v dalvik-exchange || command -v dx)}
-VERSION_CODE=20
-VERSION_NAME=2.9
+VERSION_CODE=21
+VERSION_NAME=3.0
 OUT=build
 SRC=app/src/main
 
@@ -18,7 +18,7 @@ rm -rf "$OUT" && mkdir -p "$OUT"/{gen,classes,dex}
 
 echo "▸ Compiling resources"
 # Gradle supplies the package via `namespace`; aapt2 needs it in the manifest.
-sed '0,/<manifest /s//<manifest package="com.statusvault.app" /' "$SRC/AndroidManifest.xml" > "$OUT/AndroidManifest.xml"
+sed '0,/<manifest /s//<manifest package="com.hamster.statussaver" /' "$SRC/AndroidManifest.xml" > "$OUT/AndroidManifest.xml"
 aapt2 compile --dir "$SRC/res" -o "$OUT/res.zip"
 aapt2 link -o "$OUT/base.apk" -I "$RES_JAR" \
   --manifest "$OUT/AndroidManifest.xml" --java "$OUT/gen" \
@@ -45,9 +45,9 @@ if [ ! -f "$KS" ]; then
   mkdir -p signing
   keytool -genkeypair -keystore "$KS" -storepass statusvault -keypass statusvault \
     -alias statusvault -keyalg RSA -keysize 2048 -validity 10000 \
-    -dname "CN=Status Vault" >/dev/null 2>&1
+    -dname "CN=Hamster" >/dev/null 2>&1
 fi
 apksigner sign --ks "$KS" --ks-pass pass:statusvault --key-pass pass:statusvault \
-  --out "StatusVault-v$VERSION_NAME.apk" "$OUT/aligned.apk"
-apksigner verify "StatusVault-v$VERSION_NAME.apk"
-echo "✓ StatusVault-v$VERSION_NAME.apk ($(du -h "StatusVault-v$VERSION_NAME.apk" | cut -f1))"
+  --out "Hamster-v$VERSION_NAME.apk" "$OUT/aligned.apk"
+apksigner verify "Hamster-v$VERSION_NAME.apk"
+echo "✓ Hamster-v$VERSION_NAME.apk ($(du -h "Hamster-v$VERSION_NAME.apk" | cut -f1))"

@@ -26,13 +26,13 @@
     </queries>
 
     <application
-        android:name=".StatusVaultApp"
+        android:name=".HamsterApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.StatusVault">
+        android:theme="@style/Theme.Hamster">
 
         <activity
             android:name=".MainActivity"
@@ -48,7 +48,7 @@
             android:name=".ViewerActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="false"
-            android:theme="@style/Theme.StatusVault.Viewer" />
+            android:theme="@style/Theme.Hamster.Viewer" />
 
         <activity
             android:name=".SettingsActivity"
@@ -82,7 +82,7 @@
         <!-- Serves temporary copies of statuses to the share sheet. -->
         <provider
             android:name=".ShareProvider"
-            android:authorities="com.statusvault.app.share"
+            android:authorities="com.hamster.statussaver.share"
             android:exported="false"
             android:grantUriPermissions="true" />
     </application>

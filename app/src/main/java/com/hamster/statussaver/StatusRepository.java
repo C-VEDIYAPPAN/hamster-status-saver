@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.content.ContentResolver;
 import android.content.ContentUris;
@@ -43,7 +43,7 @@ import java.util.concurrent.TimeUnit;
  */
 public final class StatusRepository {
 
-    public static final String SAVE_FOLDER = "StatusVault";
+    public static final String SAVE_FOLDER = "Hamster";
 
     private final Context context;
     private final ContentResolver resolver;
@@ -299,7 +299,7 @@ public final class StatusRepository {
         return n;
     }
 
-    /** Saves the video frame at [positionMs] as a JPEG in Pictures/StatusVault. Returns the file name. */
+    /** Saves the video frame at [positionMs] as a JPEG in Pictures/Hamster. Returns the file name. */
     public String saveVideoFrame(StatusItem item, long positionMs) throws IOException {
         MediaMetadataRetriever r = new MediaMetadataRetriever();
         Bitmap frame;

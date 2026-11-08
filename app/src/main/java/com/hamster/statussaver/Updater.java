@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.app.Activity;
 import android.app.Notification;
@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Update alerts from GitHub Releases.
  *
- * The app reads the latest release of C-VEDIYAPPAN/StatusVault (its only network call) and, if it
+ * The app reads the latest release of C-VEDIYAPPAN/hamster-status-saver (its only network call) and, if it
  * is newer, tells the user and opens the APK download in the browser. Android's own installer does
  * the rest — and Android refuses any update that isn't signed with the same key.
  *
@@ -40,7 +40,7 @@ import java.util.concurrent.TimeUnit;
  */
 final class Updater {
 
-    static final String REPO = "C-VEDIYAPPAN/StatusVault";
+    static final String REPO = "C-VEDIYAPPAN/hamster-status-saver";
     static final String RELEASES_PAGE = "https://github.com/" + REPO + "/releases/latest";
     private static final String LATEST_API = "https://api.github.com/repos/" + REPO + "/releases/latest";
     private static final String CHANNEL = "updates";
@@ -105,7 +105,7 @@ final class Updater {
     static Release fetchLatest() throws Exception {
         HttpURLConnection con = (HttpURLConnection) new URL(LATEST_API).openConnection();
         con.setRequestProperty("Accept", "application/vnd.github+json");
-        con.setRequestProperty("User-Agent", "StatusVault-Android");
+        con.setRequestProperty("User-Agent", "Hamster-Android");
         con.setConnectTimeout(15_000);
         con.setReadTimeout(20_000);
         try {
@@ -197,7 +197,7 @@ final class Updater {
         NotificationManager nm = c.getSystemService(NotificationManager.class);
         if (nm == null) return;
         NotificationChannel ch = new NotificationChannel(CHANNEL, "App updates", NotificationManager.IMPORTANCE_DEFAULT);
-        ch.setDescription("New versions of Status Vault");
+        ch.setDescription("New versions of Hamster");
         nm.createNotificationChannel(ch);
     }
 
@@ -206,7 +206,7 @@ final class Updater {
         PendingIntent pi = PendingIntent.getActivity(c, 7,
                 new Intent(Intent.ACTION_VIEW, Uri.parse(r.downloadUrl())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        notifyText(c, "Status Vault " + r.version + " is available", "Tap to download the update", pi);
+        notifyText(c, "Hamster " + r.version + " is available", "Tap to download the update", pi);
     }
 
     static void notifyText(Context c, String title, String text, PendingIntent tap) {

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Outer frame draws the rotating story ring (unseen) or a hairline (seen); the inner card holds the media. -->
-<com.statusvault.app.AspectFrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.hamster.statussaver.AspectFrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/ring"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -54,7 +54,7 @@
             android:paddingEnd="7dp"
             android:paddingBottom="7dp">
 
-            <com.statusvault.app.CountdownBadge
+            <com.hamster.statussaver.CountdownBadge
                 android:id="@+id/countdown"
                 android:layout_width="30dp"
                 android:layout_height="30dp" />
@@ -91,4 +91,4 @@
             android:contentDescription="@null"
             android:visibility="gone" />
     </FrameLayout>
-</com.statusvault.app.AspectFrameLayout>
+</com.hamster.statussaver.AspectFrameLayout>

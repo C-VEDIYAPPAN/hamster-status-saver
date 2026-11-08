@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.Manifest;
 import android.app.AlertDialog;
@@ -1188,7 +1188,7 @@ public class MainActivity extends BaseActivity {
     private void askToRegrant(final StatusSource source) {
         new AlertDialog.Builder(this)
                 .setTitle("Allow deleting")
-                .setMessage("To delete statuses, Status Vault needs to be allowed to change the "
+                .setMessage("To delete statuses, Hamster needs to be allowed to change the "
                         + source.label + " folder. The next screen opens it — tap “Use this folder”, then “Allow”.")
                 .setNegativeButton("Not now", null)
                 .setPositiveButton("Continue", new DialogInterface.OnClickListener() {

@@ -1,5 +1,5 @@
 <resources>
-    <style name="Theme.StatusVault" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.Hamster" parent="android:Theme.Material.NoActionBar">
         <item name="android:colorPrimary">@color/primary</item>
         <item name="android:colorAccent">@color/primary</item>
         <item name="android:windowBackground">@color/bg</item>

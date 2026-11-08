@@ -1,4 +1,4 @@
-package com.statusvault.app;
+package com.hamster.statussaver;
 
 import android.app.job.JobParameters;
 import android.app.job.JobService;
