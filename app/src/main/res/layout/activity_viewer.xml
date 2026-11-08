@@ -6,19 +6,36 @@
     android:background="@android:color/black"
     android:fitsSystemWindows="true">
 
-    <ImageView
-        android:id="@+id/image"
+    <!-- Media container: slides and fades between statuses -->
+    <FrameLayout
+        android:id="@+id/media"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:contentDescription="@null"
-        android:scaleType="fitCenter" />
+        android:layout_height="match_parent">
 
-    <VideoView
-        android:id="@+id/video"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_gravity="center"
-        android:visibility="gone" />
+        <ImageView
+            android:id="@+id/image"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter" />
+
+        <VideoView
+            android:id="@+id/video"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center"
+            android:visibility="gone" />
+
+        <!-- Poster frame shown over the video until its first frame is drawn (hides the black flash and resize) -->
+        <ImageView
+            android:id="@+id/poster"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@android:color/black"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <ImageView
         android:id="@+id/play_state"

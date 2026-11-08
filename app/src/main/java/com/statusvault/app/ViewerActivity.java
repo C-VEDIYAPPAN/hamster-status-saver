@@ -122,6 +122,18 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     private ScrubFrames scrub;
     private View scrubPreview, skipBack, skipForward;
     private ImageView scrubFrame;
+    private View media;
+    private ImageView poster;
+    private int navToken = 0;
+    /** The spinner only appears if loading takes a moment, so quick loads don't flicker. */
+    private final Runnable showSpinner = new Runnable() {
+        @Override
+        public void run() {
+            progress.setVisibility(View.VISIBLE);
+            progress.setAlpha(0f);
+            progress.animate().alpha(1f).setDuration(150).start();
+        }
+    };
     private TextView scrubTime, speedText;
     private android.widget.ImageButton muteBtn;
     /** Moves the seek bar along while a video plays. */
@@ -227,6 +239,15 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         playPause.setOnClickListener(toggle);
         playState.setOnClickListener(toggle);
         scrub = new ScrubFrames(this);
+        media = findViewById(R.id.media);
+        poster = (ImageView) findViewById(R.id.poster);
+        video.setOnInfoListener(new MediaPlayer.OnInfoListener() {
+            @Override
+            public boolean onInfo(MediaPlayer mp, int what, int extra) {
+                if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) revealVideo();
+                return false;
+            }
+        });
         scrubPreview = findViewById(R.id.scrub_preview);
         scrubFrame = (ImageView) findViewById(R.id.scrub_frame);
         scrubTime = (TextView) findViewById(R.id.scrub_time);
@@ -356,7 +377,15 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                     }
                 });
                 applyVolume();
-                progress.setVisibility(View.GONE);
+                hideSpinner();
+                // Fallback in case a device never reports "rendering started".
+                final int forToken = loadToken;
+                main.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (forToken == loadToken) revealVideo();
+                    }
+                }, 400);
                 int length = video.getDuration();
                 seek.setMax(Math.max(0, length));
                 seek.setProgress(0);
@@ -370,7 +399,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
             @Override
             public boolean onError(MediaPlayer mp, int what, int extra) {
                 player = null;
-                progress.setVisibility(View.GONE);
+                hideSpinner();
                 notice.show("This video can't be played", Notice.ERROR);
                 return true;
             }
@@ -434,6 +463,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     protected void onDestroy() {
         super.onDestroy();
         main.removeCallbacks(ticker);
+        main.removeCallbacks(showSpinner);
         if (scrub != null) scrub.release();
         if (video != null) video.stopPlayback();
         io.shutdownNow();
@@ -442,6 +472,72 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     // ---------------- Display ----------------
 
     private void show() {
+        show(0);
+    }
+
+    /**
+     * Moves to items[index]. [dir] +1 / -1 slides the current status out and the new one in from
+     * that side; 0 shows it in place. Rapid taps simply retarget the running transition.
+     */
+    private void show(final int dir) {
+        if (dir == 0 || media.getWidth() == 0) {
+            media.animate().cancel();
+            media.setTranslationX(0);
+            media.setAlpha(1f);
+            render();
+            return;
+        }
+        final int nav = ++navToken;
+        freezeVideo();
+        media.animate().cancel();
+        final float shift = dp(56);
+        media.animate().translationX(-dir * shift).alpha(0f).setDuration(110)
+                .setInterpolator(new android.view.animation.AccelerateInterpolator())
+                .withEndAction(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (nav != navToken || isDestroyed()) return;
+                        render();
+                        media.setTranslationX(dir * shift);
+                        media.animate().translationX(0).alpha(1f).setDuration(260)
+                                .setInterpolator(new android.view.animation.DecelerateInterpolator(1.8f)).start();
+                    }
+                }).start();
+        // Update the counter straight away so the tap feels instant.
+        counter.setText((index + 1) + " / " + items.size());
+    }
+
+    /** Before sliding a video away, cover it with its poster so the video surface doesn't lag or flash. */
+    private void freezeVideo() {
+        if (video.getVisibility() != View.VISIBLE) return;
+        if (video.isPlaying()) video.pause();
+        if (poster.getVisibility() != View.VISIBLE) {
+            poster.animate().cancel();
+            poster.setAlpha(1f);
+            poster.setVisibility(View.VISIBLE);
+        }
+        video.setVisibility(View.INVISIBLE);
+    }
+
+    /** Fades the poster away once the video is actually drawing. */
+    private void revealVideo() {
+        if (poster.getVisibility() != View.VISIBLE || video.getVisibility() != View.VISIBLE) return;
+        poster.animate().cancel();
+        poster.animate().alpha(0f).setDuration(180).withEndAction(new Runnable() {
+            @Override
+            public void run() {
+                poster.setVisibility(View.GONE);
+            }
+        }).start();
+    }
+
+    private void hideSpinner() {
+        main.removeCallbacks(showSpinner);
+        progress.animate().cancel();
+        progress.setVisibility(View.GONE);
+    }
+
+    private void render() {
         final StatusItem item = items.get(index);
         final int token = ++loadToken;
         counter.setText((index + 1) + " / " + items.size());
@@ -454,7 +550,10 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
 
         playState.setVisibility(View.GONE);
         video.stopPlayback();
-        image.setImageDrawable(null);
+        hideSpinner();
+        // Instant placeholder: the grid thumbnail (already in memory), replaced by full quality when ready.
+        Bitmap placeholder = ThumbnailLoader.get(this).peek(item, ThumbnailLoader.gridSizePx(this));
+        image.setImageBitmap(placeholder);
         prevBtn.setAlpha(index > 0 ? 1f : 0.3f);
         prevBtn.setEnabled(index > 0);
         nextBtn.setAlpha(index < items.size() - 1 ? 1f : 0.3f);
@@ -472,15 +571,19 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         durationText.setText("0:00");
         updateChrome();
 
+        main.postDelayed(showSpinner, 350);
         if (item.isVideo()) {
             image.setVisibility(View.GONE);
+            poster.animate().cancel();
+            poster.setImageBitmap(placeholder);
+            poster.setAlpha(1f);
+            poster.setVisibility(View.VISIBLE); // covers the video until its first frame
             video.setVisibility(View.VISIBLE);
-            progress.setVisibility(View.VISIBLE);
             video.setVideoURI(item.uri);
         } else {
             video.setVisibility(View.GONE);
+            poster.setVisibility(View.GONE);
             image.setVisibility(View.VISIBLE);
-            progress.setVisibility(View.VISIBLE);
             final int maxPx = Math.max(getResources().getDisplayMetrics().widthPixels,
                     getResources().getDisplayMetrics().heightPixels);
             io.execute(new Runnable() {
@@ -491,8 +594,8 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                         @Override
                         public void run() {
                             if (token != loadToken || isDestroyed()) return;
-                            progress.setVisibility(View.GONE);
-                            if (bmp != null) image.setImageBitmap(bmp);
+                            hideSpinner();
+                            if (bmp != null) image.setImageBitmap(bmp); // same framing, just sharper
                             else notice.show("This photo can't be opened", Notice.ERROR);
                         }
                     });
@@ -518,7 +621,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     public void onSwipeNext() {
         if (index < items.size() - 1) {
             index++;
-            show();
+            show(1);
         }
     }
 
@@ -526,7 +629,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     public void onSwipePrevious() {
         if (index > 0) {
             index--;
-            show();
+            show(-1);
         }
     }
 
@@ -566,7 +669,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     }
 
     private void togglePlay() {
-        if (video.getVisibility() != View.VISIBLE || progress.getVisibility() == View.VISIBLE) return;
+        if (video.getVisibility() != View.VISIBLE || player == null) return; // not ready yet
         if (video.isPlaying()) {
             video.pause();
             setPlayingUi(false);
@@ -657,7 +760,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     @Override
     public void onDoubleTap(boolean rightSide) {
         StatusItem item = items.get(index);
-        if (!item.isVideo() || player == null || progress.getVisibility() == View.VISIBLE) return;
+        if (!item.isVideo() || player == null) return;
         int length = Math.max(0, seek.getMax());
         int target = Math.max(0, Math.min(length, video.getCurrentPosition() + (rightSide ? 5000 : -5000)));
         resumeAfterSeek = video.isPlaying();

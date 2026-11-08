@@ -105,6 +105,16 @@ public final class ThumbnailLoader {
         });
     }
 
+    /** The grid thumbnail size, shared so the viewer can reuse cached thumbnails as placeholders. */
+    static int gridSizePx(Context c) {
+        return Math.round(240 * c.getResources().getDisplayMetrics().density);
+    }
+
+    /** A thumbnail already in memory for [item] at grid size, or null. Never decodes. */
+    public Bitmap peek(StatusItem item, int sizePx) {
+        return cache.get(item.uri.toString() + "@" + sizePx);
+    }
+
     /** Decodes [item] on the calling thread, downsampled to about [maxPx]. Null on failure. */
     public Bitmap decode(StatusItem item, int maxPx) {
         try {
