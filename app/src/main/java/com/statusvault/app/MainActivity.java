@@ -335,8 +335,8 @@ public class MainActivity extends BaseActivity {
     private void applyColors() {
         root.setBackground(palette.backgroundGlow(getColor(R.color.bg), getResources().getDisplayMetrics().widthPixels));
         progress.setIndeterminateTintList(ColorStateList.valueOf(palette.primary));
-        floatingBar.setBackground(palette.glass(getColor(R.color.surface), 28));
-        navIndicator.setBackground(palette.gradient(22));
+        floatingBar.setBackground(palette.glass(getColor(R.color.surface), 31));
+        navIndicator.setBackground(palette.gradient(25));
         saveAll.setBackground(palette.rounded(palette.primary, 18));
         saveAll.setTextColor(palette.onPrimary);
         saveAll.setCompoundDrawableTintList(ColorStateList.valueOf(palette.onPrimary));
@@ -572,20 +572,20 @@ public class MainActivity extends BaseActivity {
             iconBox.setClipChildren(false);
             ImageView icon = new ImageView(this);
             icon.setImageResource(icons[i]);
-            iconBox.addView(icon, new FrameLayout.LayoutParams(dp(20), dp(20), Gravity.CENTER));
+            iconBox.addView(icon, new FrameLayout.LayoutParams(dp(22), dp(22), Gravity.CENTER));
             TextView badge = new TextView(this);
-            badge.setTextSize(9);
+            badge.setTextSize(10);
             badge.setGravity(Gravity.CENTER);
-            badge.setMinWidth(dp(15));
+            badge.setMinWidth(dp(16));
             badge.setPadding(dp(4), 0, dp(4), 0);
             badge.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             badge.setVisibility(View.GONE);
-            FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(15), Gravity.TOP | Gravity.END);
+            FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(16), Gravity.TOP | Gravity.END);
             iconBox.addView(badge, bp);
-            item.addView(iconBox, new LinearLayout.LayoutParams(dp(40), dp(22)));
+            item.addView(iconBox, new LinearLayout.LayoutParams(dp(42), dp(24)));
             TextView label = new TextView(this);
             label.setText(SECTION_TITLES[i]);
-            label.setTextSize(10);
+            label.setTextSize(11);
             label.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
             label.setGravity(Gravity.CENTER);
             label.setMaxLines(1);
@@ -630,10 +630,10 @@ public class MainActivity extends BaseActivity {
         item.setContentDescription(label);
         ImageView iv = new ImageView(this);
         iv.setImageResource(icon);
-        item.addView(iv, new LinearLayout.LayoutParams(dp(20), dp(20)));
+        item.addView(iv, new LinearLayout.LayoutParams(dp(22), dp(22)));
         TextView tv = new TextView(this);
         tv.setText(label);
-        tv.setTextSize(10);
+        tv.setTextSize(11);
         tv.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         tv.setPadding(0, dp(4), 0, 0);
         tv.setGravity(Gravity.CENTER);
@@ -783,14 +783,14 @@ public class MainActivity extends BaseActivity {
                 bottomInset = insets.getSystemWindowInsetBottom();
                 FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) floatingBar.getLayoutParams();
                 lp.bottomMargin = bottomInset + dp(14);
-                // Compact pill: at most 330dp wide (16dp from the edges on small phones), centred.
+                // Floating pill: at most 380dp wide (16dp from the edges on small phones), centred.
                 int screen = root.getWidth() > 0 ? root.getWidth() : getResources().getDisplayMetrics().widthPixels;
-                lp.width = Math.min(screen - dp(32), dp(330));
+                lp.width = Math.min(screen - dp(32), dp(380));
                 lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
                 floatingBar.setLayoutParams(lp);
                 // Let the grid scroll under the floating bar, but end above it.
                 grid.setPadding(grid.getPaddingLeft(), grid.getPaddingTop(), grid.getPaddingRight(),
-                        bottomInset + dp(14 + 56 + 16));
+                        bottomInset + dp(14 + 62 + 16));
                 return insets;
             }
         });
