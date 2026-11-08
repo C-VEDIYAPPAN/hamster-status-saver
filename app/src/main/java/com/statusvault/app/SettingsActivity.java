@@ -23,7 +23,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -44,9 +43,9 @@ public class SettingsActivity extends BaseActivity {
     private FrameLayout previewHost;
     private LinearLayout swatchRow;
     private TextView columnsLabel;
-    private Switch backgroundSwitch;
+    private ToggleSwitch backgroundSwitch;
     private TextView storageValue;
-    private final java.util.List<Switch> switches = new java.util.ArrayList<>();
+    private final java.util.List<ToggleSwitch> switches = new java.util.ArrayList<>();
     private final java.util.List<LinearLayout> segments = new java.util.ArrayList<>();
     private final java.util.List<int[]> segmentSelections = new java.util.ArrayList<>();
     private SeekBar columnsSeek;
@@ -88,7 +87,10 @@ public class SettingsActivity extends BaseActivity {
         scroll.setClipToPadding(false);
         content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
-        content.setPadding(dp(16), dp(4), dp(16), dp(32));
+        // Keep the column readable on tablets / landscape: at most 600dp wide, centred.
+        float widthDp = getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density;
+        int side = widthDp > 632 ? dp((widthDp - 600) / 2f) : dp(16);
+        content.setPadding(side, dp(4), side, dp(32));
         scroll.addView(content);
         root.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         setContentView(root);
@@ -170,7 +172,7 @@ public class SettingsActivity extends BaseActivity {
         toggle(browsing, "Highlight new statuses", "A story-style ring around statuses you haven't opened",
                 prefs.newBadges(), new Toggle() {
                     @Override
-                    public void changed(Switch s, boolean on) {
+                    public void changed(ToggleSwitch s, boolean on) {
                         prefs.setNewBadges(on);
                         renderPreview();
                     }
@@ -178,7 +180,7 @@ public class SettingsActivity extends BaseActivity {
         toggle(browsing, "Show time left", "A bar showing how long until WhatsApp deletes a status (estimated)",
                 prefs.timeLeft(), new Toggle() {
                     @Override
-                    public void changed(Switch s, boolean on) {
+                    public void changed(ToggleSwitch s, boolean on) {
                         prefs.setTimeLeft(on);
                         renderPreview();
                     }
@@ -190,7 +192,7 @@ public class SettingsActivity extends BaseActivity {
         toggle(auto, "Auto-save new statuses", "Every new status is saved as soon as you open the app",
                 prefs.autoSave(), new Toggle() {
                     @Override
-                    public void changed(Switch s, boolean on) {
+                    public void changed(ToggleSwitch s, boolean on) {
                         prefs.setAutoSave(on);
                         backgroundSwitch.setEnabled(on);
                         backgroundSwitch.setAlpha(on ? 1f : 0.5f);
@@ -201,7 +203,7 @@ public class SettingsActivity extends BaseActivity {
                 "About once an hour, even when the app is closed. Shows a notification.",
                 prefs.backgroundSave(), new Toggle() {
                     @Override
-                    public void changed(Switch s, boolean on) {
+                    public void changed(ToggleSwitch s, boolean on) {
                         prefs.setBackgroundSave(on);
                         AutoSaveJob.sync(SettingsActivity.this);
                         if (on && Build.VERSION.SDK_INT >= 33
@@ -219,11 +221,11 @@ public class SettingsActivity extends BaseActivity {
         toggle(privacy, "App lock", "Fingerprint, face or screen lock to open Status Vault",
                 prefs.appLock(), new Toggle() {
                     @Override
-                    public void changed(Switch s, boolean on) {
+                    public void changed(ToggleSwitch s, boolean on) {
                         if (on) {
                             KeyguardManager km = getSystemService(KeyguardManager.class);
                             if (km == null || !km.isDeviceSecure()) {
-                                s.setChecked(false);
+                                s.setChecked(false, true);
                                 toast("Set a screen lock on your phone first");
                                 return;
                             }
@@ -460,7 +462,7 @@ public class SettingsActivity extends BaseActivity {
     }
 
     private void restyleControls() {
-        for (Switch s : switches) pal.styleSwitch(s);
+        for (ToggleSwitch s : switches) styleToggle(s);
         for (int i = 0; i < segments.size(); i++) styleSegment(segments.get(i), segmentSelections.get(i)[0]);
         columnsSeek.setProgressTintList(ColorStateList.valueOf(pal.primary));
         columnsSeek.setThumbTintList(ColorStateList.valueOf(pal.primary));
@@ -518,7 +520,7 @@ public class SettingsActivity extends BaseActivity {
 
     private interface Choice { void chosen(int index); }
 
-    private interface Toggle { void changed(Switch s, boolean on); }
+    private interface Toggle { void changed(ToggleSwitch s, boolean on); }
 
     private void section(String title) {
         TextView t = text(title.toUpperCase(), 12, 0, true);
@@ -586,37 +588,48 @@ public class SettingsActivity extends BaseActivity {
         }
     }
 
-    private Switch toggle(LinearLayout parent, String title, String subtitle, boolean checked, final Toggle listener) {
+    private ToggleSwitch toggle(LinearLayout parent, String title, String subtitle, boolean checked, final Toggle listener) {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(0, dp(10), 0, dp(10));
+        row.setPadding(0, dp(8), 0, dp(8));
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.addView(text(title, 16, R.color.on_surface, false));
         TextView sub = text(subtitle, 13, R.color.on_surface_variant, false);
-        sub.setPadding(0, dp(2), dp(12), 0);
+        sub.setPadding(0, dp(2), 0, 0);
         texts.addView(sub);
-        row.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        final Switch sw = new Switch(this);
-        sw.setChecked(checked);
-        pal.styleSwitch(sw);
-        sw.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+        tp.rightMargin = dp(12);
+        row.addView(texts, tp);
+        final ToggleSwitch sw = new ToggleSwitch(this);
+        sw.setChecked(checked, false);
+        styleToggle(sw);
+        sw.setContentDescription(title);
+        sw.setOnChangeListener(new ToggleSwitch.OnChangeListener() {
             @Override
-            public void onCheckedChanged(CompoundButton b, boolean on) {
-                b.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
-                listener.changed(sw, on);
+            public void onChanged(ToggleSwitch t, boolean on) {
+                listener.changed(t, on);
             }
         });
-        row.addView(sw);
+        // Fixed size, pinned to the right edge of every row so all toggles line up.
+        LinearLayout.LayoutParams sp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        sp.rightMargin = -dp(4); // cancel the toggle's touch padding so its edge meets the card padding
+        row.addView(sw, sp);
         row.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (sw.isEnabled()) sw.toggle();
+                if (sw.isEnabled()) sw.performClick();
             }
         });
         parent.addView(row);
         switches.add(sw);
         return sw;
+    }
+
+    private void styleToggle(ToggleSwitch sw) {
+        sw.setColors(pal.primary, pal.onPrimary,
+                pal.dark ? 0xFF2B3534 : 0xFFE3ECEB,
+                pal.dark ? 0xFF8B9796 : 0xFF6F7979);
     }
 
     private void action(LinearLayout parent, String title, String subtitle, final Runnable run) {

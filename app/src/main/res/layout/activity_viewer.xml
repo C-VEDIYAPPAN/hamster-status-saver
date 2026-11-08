@@ -79,15 +79,20 @@
             android:textSize="15sp" />
     </LinearLayout>
 
-    <!-- Actions are added in code so they can change per item (photo / video / saved). -->
+    <!-- Solid floating capsule so the actions stay readable over any photo.
+         Actions are added in code with equal weights, so they fit any screen width. -->
     <LinearLayout
         android:id="@+id/bottom_bar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:background="@drawable/bg_scrim_bottom"
+        android:layout_height="80dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="12dp"
+        android:background="@drawable/bg_viewer_capsule"
+        android:elevation="8dp"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingTop="40dp"
-        android:paddingBottom="20dp" />
+        android:paddingStart="4dp"
+        android:paddingEnd="4dp" />
 </com.statusvault.app.SwipeFrameLayout>

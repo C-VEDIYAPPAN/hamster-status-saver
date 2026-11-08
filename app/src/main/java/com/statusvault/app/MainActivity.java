@@ -347,7 +347,7 @@ public class MainActivity extends BaseActivity {
     }
 
     private void render() {
-        grid.setNumColumns(Math.max(2, Math.min(5, prefs.columns())));
+        grid.setNumColumns(columns());
         styleTabs();
         moveIndicator(indicatorAt != null);
 
@@ -435,6 +435,15 @@ public class MainActivity extends BaseActivity {
             empty.setVisibility(View.GONE);
             grid.setVisibility(View.VISIBLE);
         }
+    }
+
+    /** The user's grid size, plus extra columns on tablets / landscape so tiles stay a sensible size. */
+    private int columns() {
+        int pref = Math.max(2, Math.min(5, prefs.columns()));
+        float widthDp = getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density;
+        if (widthDp >= 840) return pref + 3;
+        if (widthDp >= 600) return pref + 2;
+        return pref;
     }
 
     private List<StatusItem> sorted(List<StatusItem> list) {
@@ -578,7 +587,13 @@ public class MainActivity extends BaseActivity {
             label.setText(SECTION_TITLES[i]);
             label.setTextSize(11);
             label.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
-            item.addView(label);
+            label.setGravity(Gravity.CENTER);
+            label.setMaxLines(1);
+            label.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            LinearLayout.LayoutParams llp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            llp.topMargin = dp(2);
+            item.addView(label, llp); // wrap_content, so the item's centre gravity actually centres it
             navTabs.addView(item, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1));
             navIcons[i] = icon;
             navLabels[i] = label;
@@ -621,7 +636,10 @@ public class MainActivity extends BaseActivity {
         tv.setTextSize(11);
         tv.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         tv.setPadding(0, dp(4), 0, 0);
-        item.addView(tv);
+        tv.setGravity(Gravity.CENTER);
+        tv.setMaxLines(1);
+        item.addView(tv, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         item.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -765,6 +783,16 @@ public class MainActivity extends BaseActivity {
                 bottomInset = insets.getSystemWindowInsetBottom();
                 FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) floatingBar.getLayoutParams();
                 lp.bottomMargin = bottomInset + dp(14);
+                // On tablets / landscape, keep the bar a comfortable width, centred.
+                float widthDp = root.getWidth() > 0 ? root.getWidth() / getResources().getDisplayMetrics().density
+                        : getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density;
+                if (widthDp > 560) {
+                    lp.width = dp(480);
+                    lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+                } else {
+                    lp.width = FrameLayout.LayoutParams.MATCH_PARENT;
+                    lp.gravity = Gravity.BOTTOM;
+                }
                 floatingBar.setLayoutParams(lp);
                 // Let the grid scroll under the floating bar, but end above it.
                 grid.setPadding(grid.getPaddingLeft(), grid.getPaddingTop(), grid.getPaddingRight(),
@@ -1186,6 +1214,15 @@ public class MainActivity extends BaseActivity {
             boolean isSelected = selected.contains(item.uri.toString());
             int cols = Math.max(2, Math.min(5, prefs.columns()));
             boolean compact = cols >= 5;
+            boolean small = cols >= 4;
+            ViewGroup.LayoutParams sbp = saveBtn.getLayoutParams();
+            int sbSize = dp(small ? 26 : 32);
+            if (sbp.width != sbSize) {
+                sbp.width = sbSize;
+                sbp.height = sbSize;
+                saveBtn.setLayoutParams(sbp);
+                saveBtn.setPadding(dp(small ? 5 : 7), dp(small ? 5 : 7), dp(small ? 5 : 7), dp(small ? 5 : 7));
+            }
 
             // Story-style ring on statuses you haven't opened
             boolean isNew = isStatus && prefs.newBadges() && !seen.contains(item.name);

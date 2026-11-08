@@ -177,6 +177,15 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         actDelete = addAction(R.drawable.ic_delete, "Delete", false, new Runnable() {
             public void run() { confirmDelete(items.get(index)); }
         });
+        styleAction(actDelete, false, false);
+        ((TextView) actDelete.findViewById(R.id.action_label)).setTextColor(0xFFFFB4AB);
+        // On tablets / landscape, keep the action capsule a comfortable width, centred.
+        float widthDp = getResources().getDisplayMetrics().widthPixels / getResources().getDisplayMetrics().density;
+        if (widthDp > 560) {
+            android.widget.FrameLayout.LayoutParams blp = (android.widget.FrameLayout.LayoutParams) bottomBar.getLayoutParams();
+            blp.width = dp(460);
+            bottomBar.setLayoutParams(blp);
+        }
 
         video.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
             @Override
@@ -212,14 +221,15 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                 action.run();
             }
         });
-        bottomBar.addView(v);
+        bottomBar.addView(v, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1));
         return v;
     }
 
     private void styleAction(View v, boolean primary, boolean done) {
         ImageView iv = (ImageView) v.findViewById(R.id.action_icon);
-        int bg = done ? 0x33FFFFFF : primary ? accent : 0x33FFFFFF;
-        int fg = done ? 0xCCFFFFFF : primary ? onAccent : 0xFFFFFFFF;
+        boolean danger = v == actDelete;
+        int bg = done ? 0x26FFFFFF : primary ? accent : danger ? 0x33FF5449 : 0x26FFFFFF;
+        int fg = done ? 0xCCFFFFFF : primary ? onAccent : danger ? 0xFFFFB4AB : 0xFFFFFFFF;
         iv.setBackground(Palette.oval(bg));
         iv.setImageTintList(ColorStateList.valueOf(fg));
     }
@@ -555,6 +565,10 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         }
         index = Math.min(index, items.size() - 1);
         show();
+    }
+
+    private int dp(float v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
     private void toast(String msg) {
