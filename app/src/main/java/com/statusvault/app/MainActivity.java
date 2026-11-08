@@ -72,6 +72,13 @@ public class MainActivity extends BaseActivity {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private StatusRepository repo;
+    /** The live main screen, so Settings can rebuild it in the background after a theme switch. */
+    private static java.lang.ref.WeakReference<MainActivity> current;
+
+    static void recreateInBackground() {
+        MainActivity m = current != null ? current.get() : null;
+        if (m != null && !m.isFinishing() && !m.isDestroyed()) m.recreate();
+    }
     private Notice notice;
     /** "View" action on save messages: jump to the Saved tab. */
     private final Runnable openSaved = new Runnable() {
@@ -127,6 +134,7 @@ public class MainActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        current = new java.lang.ref.WeakReference<>(this);
         repo = new StatusRepository(this);
         prefs = new Prefs(this);
         palette = new Palette(this);
@@ -145,6 +153,11 @@ public class MainActivity extends BaseActivity {
         if (savedInstanceState != null) {
             section = Section.values()[savedInstanceState.getInt(KEY_SECTION, 0)];
             filter = Filter.values()[savedInstanceState.getInt(KEY_FILTER, 0)];
+        }
+        else {
+            // Settings → Open on: a fixed tab, or wherever you left off
+            int open = prefs.openOn() == 3 ? prefs.lastTab() : prefs.openOn();
+            section = Section.values()[Math.max(0, Math.min(2, open))];
         }
         if (getIntent().getBooleanExtra(EXTRA_OPEN_SAVED, false)) section = Section.SAVED;
 
@@ -779,6 +792,7 @@ public class MainActivity extends BaseActivity {
     private void switchSection(Section s) {
         if (section == s) return;
         section = s;
+        prefs.setLastTab(s.ordinal());
         selected.clear();
         animateGrid();
         moveIndicator(true);

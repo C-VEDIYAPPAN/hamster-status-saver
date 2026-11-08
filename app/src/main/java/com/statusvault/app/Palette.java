@@ -10,16 +10,27 @@ import android.widget.Switch;
 /** Accent colours chosen in Settings, resolved for the current light/dark mode. */
 final class Palette {
 
-    static final String[] NAMES = {"Teal", "Ocean", "Violet", "Rose", "Amber", "Forest"};
+    static final String[] NAMES = {"Teal", "Ocean", "Violet", "Rose", "Amber", "Forest",
+            "Indigo", "Sky", "Mint", "Lime", "Sunset", "Crimson", "Graphite"};
+
+    /** Stored accent value meaning "match my wallpaper" (Material You, Android 12+). */
+    static final int WALLPAPER = 99;
 
     // light primary, light container, light on-container, dark primary, dark container, dark on-container, dark on-primary
     private static final int[][] SETS = {
-            {0xFF00696B, 0xFFC8F0EE, 0xFF00302F, 0xFF7DD6D2, 0xFF0E4E4C, 0xFFB6F0EC, 0xFF003735},
-            {0xFF1A5FB4, 0xFFD6E3FF, 0xFF001B3E, 0xFFA9C7FF, 0xFF0F4A8A, 0xFFD6E3FF, 0xFF002F64},
-            {0xFF6B4EAD, 0xFFEADDFF, 0xFF25005A, 0xFFD0BCFF, 0xFF4F378B, 0xFFEADDFF, 0xFF381E72},
-            {0xFFB3265E, 0xFFFFD9E2, 0xFF3E001D, 0xFFFFB1C8, 0xFF8E0F47, 0xFFFFD9E2, 0xFF5E1133},
-            {0xFF8A5100, 0xFFFFDCBE, 0xFF2C1600, 0xFFFFB870, 0xFF693C00, 0xFFFFDCBE, 0xFF4A2800},
-            {0xFF2E6B30, 0xFFB1F2A9, 0xFF002204, 0xFF96D68F, 0xFF15521B, 0xFFB1F2A9, 0xFF00390A},
+            {0xFF00696B, 0xFFC8F0EE, 0xFF00302F, 0xFF7DD6D2, 0xFF0E4E4C, 0xFFB6F0EC, 0xFF003735}, // Teal
+            {0xFF1A5FB4, 0xFFD6E3FF, 0xFF001B3E, 0xFFA9C7FF, 0xFF0F4A8A, 0xFFD6E3FF, 0xFF002F64}, // Ocean
+            {0xFF6B4EAD, 0xFFEADDFF, 0xFF25005A, 0xFFD0BCFF, 0xFF4F378B, 0xFFEADDFF, 0xFF381E72}, // Violet
+            {0xFFB3265E, 0xFFFFD9E2, 0xFF3E001D, 0xFFFFB1C8, 0xFF8E0F47, 0xFFFFD9E2, 0xFF5E1133}, // Rose
+            {0xFF8A5100, 0xFFFFDCBE, 0xFF2C1600, 0xFFFFB870, 0xFF693C00, 0xFFFFDCBE, 0xFF4A2800}, // Amber
+            {0xFF2E6B30, 0xFFB1F2A9, 0xFF002204, 0xFF96D68F, 0xFF15521B, 0xFFB1F2A9, 0xFF00390A}, // Forest
+            {0xFF4355B9, 0xFFDEE0FF, 0xFF00105C, 0xFFBAC3FF, 0xFF293CA0, 0xFFDEE0FF, 0xFF08218A}, // Indigo
+            {0xFF006782, 0xFFBDE9FF, 0xFF001F29, 0xFF65D3FF, 0xFF004D62, 0xFFBDE9FF, 0xFF003545}, // Sky
+            {0xFF006C4C, 0xFF89F8C7, 0xFF002114, 0xFF6CDBAC, 0xFF005138, 0xFF89F8C7, 0xFF003826}, // Mint
+            {0xFF4C6700, 0xFFC8F07A, 0xFF141F00, 0xFFADD461, 0xFF394E00, 0xFFC8F07A, 0xFF253600}, // Lime
+            {0xFF9C4400, 0xFFFFDBC9, 0xFF331200, 0xFFFFB68C, 0xFF773300, 0xFFFFDBC9, 0xFF542100}, // Sunset
+            {0xFFB3261E, 0xFFFFDAD6, 0xFF410002, 0xFFFFB4AB, 0xFF8C1D18, 0xFFFFDAD6, 0xFF690005}, // Crimson
+            {0xFF5C5F61, 0xFFE0E3E5, 0xFF191C1E, 0xFFC4C7C9, 0xFF444749, 0xFFE0E3E5, 0xFF2D3133}, // Graphite
     };
 
     final int primary, onPrimary, container, onContainer;
@@ -36,23 +47,50 @@ final class Palette {
 
     Palette(Context context, int accent) {
         dark = isDark(context);
-        int[] s = SETS[clamp(accent)];
+        int[] s = set(context, accent);
         primary = dark ? s[3] : s[0];
         onPrimary = dark ? s[6] : 0xFFFFFFFF;
         container = dark ? s[4] : s[1];
         onContainer = dark ? s[5] : s[2];
-        int[] next = SETS[(clamp(accent) + 1) % SETS.length];
+        int[] next = accent == WALLPAPER && wallpaperAvailable() ? wallpaperSecond(context)
+                : SETS[(clamp(accent) + 1) % SETS.length];
         secondary = dark ? next[3] : next[0];
         error = dark ? 0xFFFFB4AB : 0xFFBA1A1A;
         density = context.getResources().getDisplayMetrics().density;
     }
 
-    /** Colours for the always-dark viewer. */
-    static int viewerPrimary(Context c) { return SETS[clamp(new Prefs(c).accent())][3]; }
-    static int viewerOnPrimary(Context c) { return SETS[clamp(new Prefs(c).accent())][6]; }
+    static boolean wallpaperAvailable() {
+        return android.os.Build.VERSION.SDK_INT >= 31;
+    }
 
-    static int swatch(int index, boolean dark) { return SETS[clamp(index)][dark ? 3 : 0]; }
+    /** The 7 tones for an accent; "wallpaper" reads the phone's Material You colours. */
+    private static int[] set(Context c, int accent) {
+        if (accent == WALLPAPER && wallpaperAvailable()) {
+            return new int[]{
+                    c.getColor(android.R.color.system_accent1_600), c.getColor(android.R.color.system_accent1_100),
+                    c.getColor(android.R.color.system_accent1_900), c.getColor(android.R.color.system_accent1_200),
+                    c.getColor(android.R.color.system_accent1_700), c.getColor(android.R.color.system_accent1_100),
+                    c.getColor(android.R.color.system_accent1_800)};
+        }
+        return SETS[clamp(accent)];
+    }
+
+    private static int[] wallpaperSecond(Context c) {
+        return new int[]{
+                c.getColor(android.R.color.system_accent3_600), 0, 0,
+                c.getColor(android.R.color.system_accent3_200), 0, 0, 0};
+    }
+
+    /** Colours for the always-dark viewer. */
+    static int viewerPrimary(Context c) { return set(c, new Prefs(c).accent())[3]; }
+    static int viewerOnPrimary(Context c) { return set(c, new Prefs(c).accent())[6]; }
+
+    static int swatch(Context c, int index, boolean dark) { return set(c, index)[dark ? 3 : 0]; }
     static int count() { return SETS.length; }
+
+    static String name(int index) {
+        return index == WALLPAPER ? "Wallpaper" : NAMES[clamp(index)];
+    }
 
     static boolean isDark(Context c) {
         return (c.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)

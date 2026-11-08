@@ -166,6 +166,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
             }
         });
         prefs = new Prefs(this);
+        muted = prefs.startMuted(); // Settings → Start videos muted
         accent = Palette.viewerPrimary(this);
         onAccent = Palette.viewerOnPrimary(this);
 
@@ -255,6 +256,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         skipForward = findViewById(R.id.skip_forward);
         speedText = (TextView) findViewById(R.id.speed);
         muteBtn = (android.widget.ImageButton) findViewById(R.id.mute);
+        muteBtn.setImageResource(muted ? R.drawable.ic_volume_off : R.drawable.ic_volume_up);
         speedText.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -390,9 +392,15 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                 seek.setMax(Math.max(0, length));
                 seek.setProgress(0);
                 durationText.setText(MainActivity.durationLabel(length));
-                video.start();
-                applySpeed();
-                setPlayingUi(true);
+                if (prefs.autoplay()) {
+                    video.start();
+                    applySpeed();
+                    setPlayingUi(true);
+                } else {
+                    // Settings → Autoplay off: show the first frame and wait for a tap on play
+                    video.seekTo(1);
+                    setPlayingUi(false);
+                }
             }
         });
         video.setOnErrorListener(new MediaPlayer.OnErrorListener() {

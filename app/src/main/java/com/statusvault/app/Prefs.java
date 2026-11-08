@@ -46,6 +46,27 @@ final class Prefs {
     boolean appLock() { return p.getBoolean("app_lock", false); }
     void setAppLock(boolean v) { p.edit().putBoolean("app_lock", v).apply(); }
 
+    /** Tab on launch: 0 WhatsApp, 1 Business, 2 Saved, 3 wherever you left off. */
+    int openOn() { return p.getInt("open_on", 3); }
+    void setOpenOn(int v) { p.edit().putInt("open_on", v).apply(); }
+    int lastTab() { return p.getInt("last_tab", 0); }
+    void setLastTab(int v) { p.edit().putInt("last_tab", v).apply(); }
+
+    boolean autoplay() { return p.getBoolean("autoplay", true); }
+    void setAutoplay(boolean v) { p.edit().putBoolean("autoplay", v).apply(); }
+
+    boolean startMuted() { return p.getBoolean("start_muted", false); }
+    void setStartMuted(boolean v) { p.edit().putBoolean("start_muted", v).apply(); }
+
+    /** Back to defaults. Keeps which statuses you've opened and deleted, and your last tab. */
+    void resetSettings() {
+        String[] keys = {"theme", "accent", "columns", "sort", "new_badges", "time_left", "auto_save",
+                "background_save", "app_lock", "lock_delay", "open_on", "autoplay", "start_muted"};
+        SharedPreferences.Editor e = p.edit();
+        for (String k : keys) e.remove(k);
+        e.apply();
+    }
+
     /** App lock delay: 0 = immediately, 1 = after 1 minute, 2 = after 5 minutes. */
     int lockDelay() { return p.getInt("lock_delay", 1); }
     void setLockDelay(int v) { p.edit().putInt("lock_delay", v).apply(); }

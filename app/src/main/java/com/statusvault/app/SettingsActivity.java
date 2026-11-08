@@ -44,6 +44,8 @@ public class SettingsActivity extends BaseActivity {
     private LinearLayout content;
     private FrameLayout previewHost;
     private LinearLayout swatchRow;
+    private TextView accentName;
+    private float lastTapX, lastTapY;
     private TextView columnsLabel;
     private ToggleSwitch backgroundSwitch;
     private TextView storageValue;
@@ -104,6 +106,7 @@ public class SettingsActivity extends BaseActivity {
         setContentView(root);
 
         build();
+        ThemeTransition.play(this); // no-op unless we're coming from a theme switch
     }
 
     @Override
@@ -129,11 +132,23 @@ public class SettingsActivity extends BaseActivity {
             public void chosen(int i) {
                 if (i == prefs.theme()) return;
                 prefs.setTheme(i);
-                recreate(); // re-applies light/dark immediately
+                // Rebuild the main screen now, while it's hidden, so it doesn't flash when you go back.
+                MainActivity.recreateInBackground();
+                // Picture of the current screen + circular reveal of the new theme from the tap.
+                ThemeTransition.capture(SettingsActivity.this, lastTapX, lastTapY);
+                recreate();
+                overridePendingTransition(0, 0);
             }
         }), segmentParams());
 
-        label(appearance, "Accent colour", null);
+        LinearLayout accentHeader = new LinearLayout(this);
+        accentHeader.setGravity(Gravity.CENTER_VERTICAL);
+        accentHeader.setPadding(0, dp(8), 0, dp(8));
+        accentHeader.addView(text("Accent colour", 16, R.color.on_surface, false),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        accentName = text(Palette.name(prefs.accent()), 14, R.color.on_surface_variant, false);
+        accentHeader.addView(accentName);
+        appearance.addView(accentHeader);
         swatchRow = new LinearLayout(this);
         swatchRow.setGravity(Gravity.CENTER_VERTICAL);
         swatchRow.setPadding(0, dp(4), 0, dp(12));
@@ -170,6 +185,13 @@ public class SettingsActivity extends BaseActivity {
         // ---- Browsing ----
         section("Browsing");
         LinearLayout browsing = card();
+        label(browsing, "Open on", null);
+        browsing.addView(segmented(new String[]{"WhatsApp", "Business", "Saved", "Last used"}, prefs.openOn(), new Choice() {
+            @Override
+            public void chosen(int i) {
+                prefs.setOpenOn(i);
+            }
+        }), segmentParams());
         label(browsing, "Sort by", null);
         browsing.addView(segmented(new String[]{"Newest", "Oldest", "Largest"}, prefs.sort(), new Choice() {
             @Override
@@ -195,6 +217,23 @@ public class SettingsActivity extends BaseActivity {
                 });
 
         // ---- Auto-save ----
+        section("Viewer");
+        LinearLayout viewer = card();
+        toggle(viewer, "Autoplay videos", "Start playing as soon as you open a video",
+                prefs.autoplay(), new Toggle() {
+                    @Override
+                    public void changed(ToggleSwitch s, boolean on) {
+                        prefs.setAutoplay(on);
+                    }
+                });
+        toggle(viewer, "Start videos muted", "Turn sound on any time with the speaker button",
+                prefs.startMuted(), new Toggle() {
+                    @Override
+                    public void changed(ToggleSwitch s, boolean on) {
+                        prefs.setStartMuted(on);
+                    }
+                });
+
         section("Auto-save");
         LinearLayout auto = card();
         toggle(auto, "Auto-save new statuses", "Every new status is saved as soon as you open the app",
@@ -301,6 +340,34 @@ public class SettingsActivity extends BaseActivity {
         TextView note = text("Only save statuses you have permission to keep.", 13, R.color.on_surface_variant, false);
         note.setPadding(0, 0, 0, dp(6));
         about.addView(note);
+        action(about, "Reset settings", "Back to the default look and options. Your saved statuses aren't touched.", new Runnable() {
+            public void run() {
+                confirmReset();
+            }
+        });
+    }
+
+    private void confirmReset() {
+        android.app.AlertDialog d = new android.app.AlertDialog.Builder(this)
+                .setTitle("Reset all settings?")
+                .setMessage("Theme, colours, grid, auto-save, app lock and viewer options go back to their defaults. "
+                        + "Your saved statuses and folder access stay as they are.")
+                .setNegativeButton("Cancel", null)
+                .setPositiveButton("Reset", new android.content.DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(android.content.DialogInterface di, int which) {
+                        prefs.resetSettings();
+                        AutoSaveJob.sync(SettingsActivity.this);
+                        StatusVaultApp.applyRecentsPrivacy(SettingsActivity.this);
+                        MainActivity.recreateInBackground();
+                        android.util.DisplayMetrics m = getResources().getDisplayMetrics();
+                        ThemeTransition.capture(SettingsActivity.this, m.widthPixels / 2f, m.heightPixels / 2f);
+                        recreate();
+                        overridePendingTransition(0, 0);
+                    }
+                })
+                .show();
+        d.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setTextColor(pal.error);
     }
 
     // ---------------- Live preview ----------------
@@ -442,26 +509,51 @@ public class SettingsActivity extends BaseActivity {
 
     private void renderSwatches() {
         swatchRow.removeAllViews();
+        swatchRow.setOrientation(LinearLayout.VERTICAL);
         int current = prefs.accent();
-        for (int i = 0; i < Palette.count(); i++) {
-            final int idx = i;
+        // Wallpaper colours first (Android 12+), then the fixed accents — 7 per row.
+        java.util.List<Integer> options = new java.util.ArrayList<>();
+        if (Palette.wallpaperAvailable()) options.add(Palette.WALLPAPER);
+        for (int i = 0; i < Palette.count(); i++) options.add(i);
+        int perRow = 7;
+        LinearLayout row = null;
+        for (int n = 0; n < options.size(); n++) {
+            if (n % perRow == 0) {
+                row = new LinearLayout(this);
+                LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+                if (n > 0) rp.topMargin = dp(8);
+                swatchRow.addView(row, rp);
+            }
+            final int idx = options.get(n);
+            boolean selected = idx == current;
             FrameLayout holder = new FrameLayout(this);
             View dot = new View(this);
-            GradientDrawable d = Palette.oval(Palette.swatch(i, pal.dark));
-            dot.setBackground(d);
-            int size = dp(34);
-            holder.addView(dot, new FrameLayout.LayoutParams(size, size, Gravity.CENTER));
-            if (i == current) {
+            if (idx == Palette.WALLPAPER) {
+                // Wallpaper swatch: a split circle of the two Material You accents
+                GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TL_BR,
+                        new int[]{Palette.swatch(this, idx, pal.dark), getColor(android.R.color.system_accent3_200)});
+                g.setShape(GradientDrawable.OVAL);
+                dot.setBackground(g);
+            } else {
+                dot.setBackground(Palette.oval(Palette.swatch(this, idx, pal.dark)));
+            }
+            holder.addView(dot, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
+            if (selected) {
                 GradientDrawable ring = new GradientDrawable();
                 ring.setShape(GradientDrawable.OVAL);
-                ring.setStroke(dp(2), Palette.swatch(i, pal.dark));
+                ring.setStroke(dp(2), Palette.swatch(this, idx, pal.dark));
                 holder.setBackground(ring);
                 ImageView check = new ImageView(this);
                 check.setImageResource(R.drawable.ic_done);
                 check.setImageTintList(ColorStateList.valueOf(pal.dark ? 0xFF1A1A1A : 0xFFFFFFFF));
-                holder.addView(check, new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER));
+                holder.addView(check, new FrameLayout.LayoutParams(dp(16), dp(16), Gravity.CENTER));
+            } else if (idx == Palette.WALLPAPER) {
+                TextView w = text("W", 12, 0, true);
+                w.setTextColor(pal.dark ? 0xFF1A1A1A : 0xFFFFFFFF);
+                w.setGravity(Gravity.CENTER);
+                holder.addView(w, new FrameLayout.LayoutParams(dp(32), dp(32), Gravity.CENTER));
             }
-            holder.setContentDescription(Palette.NAMES[i] + " accent");
+            holder.setContentDescription(Palette.name(idx) + " accent");
             holder.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -469,19 +561,23 @@ public class SettingsActivity extends BaseActivity {
                     v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
                     prefs.setAccent(idx);
                     pal = new Palette(SettingsActivity.this);
+                    accentName.setText(Palette.name(idx));
                     renderSwatches();
                     renderPreview();
                     restyleControls();
                 }
             });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(44), dp(44));
-            lp.rightMargin = dp(6);
-            swatchRow.addView(holder, lp);
-            if (i == current) {
+            // Equal-width cells so 7 fit on any phone; the circle stays centred in its cell.
+            row.addView(holder, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
+            if (selected) {
                 holder.setScaleX(0.8f);
                 holder.setScaleY(0.8f);
                 holder.animate().scaleX(1f).scaleY(1f).setDuration(160).start();
             }
+        }
+        // Pad the last row so circles keep the same size and spacing.
+        while (row != null && row.getChildCount() < perRow) {
+            row.addView(new View(this), new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
         }
     }
 
@@ -590,6 +686,10 @@ public class SettingsActivity extends BaseActivity {
                 public void onClick(View v) {
                     if (selected[0] == idx) return;
                     v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                    int[] loc = new int[2];
+                    v.getLocationInWindow(loc);
+                    lastTapX = loc[0] + v.getWidth() / 2f;
+                    lastTapY = loc[1] + v.getHeight() / 2f;
                     selected[0] = idx;
                     styleSegment(group, idx);
                     choice.chosen(idx);
