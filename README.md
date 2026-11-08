@@ -1,11 +1,11 @@
 # Status Vault
 
 View, save and share WhatsApp and WhatsApp Business statuses on Android.
-Plain Java on the Android framework — **no libraries**, so the APK is about 60 KB.
+Plain Java on the Android framework — **no libraries**, so the APK is under 100 KB.
 
 ## Install
 
-1. Copy `StatusVault-v1.0.apk` to your phone and open it.
+1. Copy `StatusVault-v1.1.apk` to your phone and open it.
 2. Allow "Install unknown apps" for your file manager or browser when Android asks.
 3. Open **Status Vault** → tap **Grant access** → on the folder screen tap **Use this folder → Allow**.
 
@@ -14,11 +14,27 @@ and WhatsApp deletes them after 24 hours.
 
 ## Features
 
-- **WhatsApp / Business / Saved** sections, with All · Photos · Videos filters and counts
-- One-tap save to `Pictures/StatusVault` or `Movies/StatusVault` (appears in Gallery)
-- Full-screen viewer: swipe between statuses, videos loop, tap to pause, Save and Share buttons
-- Auto-refresh when you come back from WhatsApp
-- Light and dark theme, works edge-to-edge on Android 15
+**Browse**
+- **WhatsApp / Business / Saved** sections with All · Photos · Videos filters, counts and total size
+- **NEW** badge on statuses you haven't opened yet
+- **Time-left** badge — roughly how long before WhatsApp deletes a status
+- Sort by newest, oldest or largest; 2–5 column grid
+
+**Act**
+- **Multi-select** — long-press, then save, share, repost or delete many at once
+- **Repost to WhatsApp** — opens WhatsApp ready to post as your own status
+- **Grab a photo from a video** — pause anywhere and save that exact frame
+- Full-screen viewer: swipe between statuses, videos loop, tap to pause
+- Delete from Saved (Android asks to confirm for files saved before a reinstall)
+
+**Automate & protect**
+- **Auto-save** every new status when you open the app
+- **Background check** about once an hour, with a notification
+- **App lock** with fingerprint, face or screen lock
+- No internet permission — nothing leaves the phone
+
+**Settings** — live preview card, 6 accent colours, Light / Dark / System theme,
+grid slider, sort, badges, auto-save, app lock, storage clean-up, folder reset.
 
 ## Build
 
@@ -43,9 +59,14 @@ MediaStore, which needs no storage permission on Android 10+.
 
 ```
 app/src/main/java/com/statusvault/app/
-├── MainActivity.java       Sections, filters, grid, access prompt, saving
-├── ViewerActivity.java     Full-screen swipe viewer, video playback, share
-├── StatusRepository.java   SAF reading, MediaStore saving, share copies
+├── MainActivity.java       Sections, filters, grid, multi-select, auto-save
+├── SettingsActivity.java   Interactive settings with live preview
+├── LockActivity.java       App lock (BiometricPrompt / screen lock)
+├── AutoSaveJob.java        Hourly background auto-save + notification
+├── StatusVaultApp.java     Locks the app when it returns from background
+├── Prefs.java, Palette.java, BaseActivity.java   Settings, accent colours, theme override
+├── ViewerActivity.java     Swipe viewer: save, repost, share, frame grab, delete
+├── StatusRepository.java   SAF reading, MediaStore save/delete, frames, share copies
 ├── ThumbnailLoader.java    Background image/video-frame thumbnails + memory cache
 ├── ShareProvider.java      Serves shared files to other apps
 ├── StatusSource.java       WhatsApp / Business folder locations

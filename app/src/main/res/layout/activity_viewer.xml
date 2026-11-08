@@ -79,6 +79,7 @@
             android:textSize="15sp" />
     </LinearLayout>
 
+    <!-- Actions are added in code so they can change per item (photo / video / saved). -->
     <LinearLayout
         android:id="@+id/bottom_bar"
         android:layout_width="match_parent"
@@ -87,26 +88,6 @@
         android:background="@drawable/bg_scrim_bottom"
         android:gravity="center"
         android:orientation="horizontal"
-        android:paddingTop="32dp"
-        android:paddingBottom="24dp">
-
-        <Button
-            android:id="@+id/save"
-            style="@style/ViewerButton"
-            android:background="@drawable/bg_viewer_primary"
-            android:drawableStart="@drawable/ic_download"
-            android:drawableTint="#003735"
-            android:text="Save"
-            android:textColor="#003735" />
-
-        <Button
-            android:id="@+id/share"
-            style="@style/ViewerButton"
-            android:layout_marginStart="12dp"
-            android:background="@drawable/bg_viewer_secondary"
-            android:drawableStart="@drawable/ic_share"
-            android:drawableTint="#FFFFFF"
-            android:text="Share"
-            android:textColor="#FFFFFF" />
-    </LinearLayout>
+        android:paddingTop="40dp"
+        android:paddingBottom="20dp" />
 </com.statusvault.app.SwipeFrameLayout>

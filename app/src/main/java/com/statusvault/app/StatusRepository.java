@@ -5,6 +5,10 @@ import android.content.ContentUris;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentSender;
+import android.app.RecoverableSecurityException;
+import android.graphics.Bitmap;
+import android.media.MediaMetadataRetriever;
 import android.content.SharedPreferences;
 import android.content.UriPermission;
 import android.content.pm.PackageManager;
@@ -25,6 +29,8 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
@@ -88,6 +94,18 @@ public final class StatusRepository {
         prefs.edit().putString(source.prefKey(), treeUri.toString()).apply();
     }
 
+    /** Forget the folder grant (Settings → change folder). */
+    public void revokeAccess(StatusSource source) {
+        Uri uri = accessUri(source);
+        if (uri != null) {
+            try {
+                resolver.releasePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (SecurityException ignored) {
+            }
+        }
+        prefs.edit().remove(source.prefKey()).apply();
+    }
+
     // ---------------- Reading ----------------
 
     public List<StatusItem> loadStatuses(StatusSource source) {
@@ -102,6 +120,7 @@ public final class StatusRepository {
                 DocumentsContract.Document.COLUMN_DISPLAY_NAME,
                 DocumentsContract.Document.COLUMN_MIME_TYPE,
                 DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+                DocumentsContract.Document.COLUMN_SIZE,
         };
         // One cursor for the whole folder — far faster than DocumentFile.listFiles().
         try (Cursor c = resolver.query(children, projection, null, null, null)) {
@@ -114,7 +133,7 @@ public final class StatusRepository {
                     if (mime == null) continue;
                     items.add(new StatusItem(
                             DocumentsContract.buildDocumentUriUsingTree(tree, docId),
-                            name, mime, c.getLong(3)));
+                            name, mime, c.getLong(3), c.isNull(4) ? 0 : c.getLong(4)));
                 }
             }
         } catch (SecurityException | IllegalArgumentException e) {
@@ -136,6 +155,7 @@ public final class StatusRepository {
                 MediaStore.MediaColumns.DISPLAY_NAME,
                 MediaStore.MediaColumns.MIME_TYPE,
                 MediaStore.MediaColumns.DATE_MODIFIED,
+                MediaStore.MediaColumns.SIZE,
         };
         Uri[] collections = {
                 MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -150,7 +170,7 @@ public final class StatusRepository {
                     if (name == null || mime == null) continue;
                     items.add(new StatusItem(
                             ContentUris.withAppendedId(collection, c.getLong(0)),
-                            name, mime, c.getLong(3) * 1000L));
+                            name, mime, c.getLong(3) * 1000L, c.isNull(4) ? 0 : c.getLong(4)));
                 }
             } catch (SecurityException e) {
                 // Android 9 and below, before the storage permission is granted.
@@ -201,20 +221,130 @@ public final class StatusRepository {
     }
 
     /**
-     * A URI other apps can read. Gallery copies are shared as-is; statuses are copied into
+     * URIs other apps can read. Gallery copies are shared as-is; statuses are copied into
      * the cache first because the folder grant belongs to this app only.
      */
-    public Uri shareableUri(StatusItem item) throws IOException {
-        if (MediaStore.AUTHORITY.equals(item.uri.getAuthority())) return item.uri;
+    public ArrayList<Uri> shareableUris(List<StatusItem> items) throws IOException {
         File dir = ShareProvider.shareDir(context);
         File[] old = dir.listFiles();
         if (old != null) for (File f : old) //noinspection ResultOfMethodCallIgnored
             f.delete(); // keep only the latest share
-        File file = new File(dir, item.name);
-        try (InputStream in = open(item.uri); OutputStream out = new FileOutputStream(file)) {
-            copy(in, out);
+        ArrayList<Uri> out = new ArrayList<>(items.size());
+        for (StatusItem item : items) {
+            if (MediaStore.AUTHORITY.equals(item.uri.getAuthority())) {
+                out.add(item.uri);
+                continue;
+            }
+            File file = new File(dir, item.name);
+            try (InputStream in = open(item.uri); OutputStream o = new FileOutputStream(file)) {
+                copy(in, o);
+            }
+            out.add(ShareProvider.uriFor(file));
         }
-        return ShareProvider.uriFor(file);
+        return out;
+    }
+
+    /**
+     * Deletes saved gallery items. Files this install created are deleted directly.
+     * For others (e.g. saved before a reinstall) Android must ask the user: in that case this
+     * returns an IntentSender to launch with startIntentSenderForResult; otherwise null.
+     */
+    public IntentSender delete(List<StatusItem> items) {
+        List<Uri> needConfirm = new ArrayList<>();
+        for (StatusItem item : items) {
+            try {
+                resolver.delete(item.uri, null, null);
+            } catch (SecurityException e) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    needConfirm.add(item.uri);
+                } else if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && e instanceof RecoverableSecurityException) {
+                    return ((RecoverableSecurityException) e).getUserAction().getActionIntent().getIntentSender();
+                } else {
+                    throw e;
+                }
+            }
+        }
+        if (!needConfirm.isEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return MediaStore.createDeleteRequest(resolver, needConfirm).getIntentSender();
+        }
+        return null;
+    }
+
+    /** Saves the video frame at [positionMs] as a JPEG in Pictures/StatusVault. Returns the file name. */
+    public String saveVideoFrame(StatusItem item, long positionMs) throws IOException {
+        MediaMetadataRetriever r = new MediaMetadataRetriever();
+        Bitmap frame;
+        try {
+            r.setDataSource(context, item.uri);
+            frame = r.getFrameAtTime(Math.max(0, positionMs) * 1000L, MediaMetadataRetriever.OPTION_CLOSEST);
+        } catch (RuntimeException e) {
+            throw new IOException("Couldn't read this video");
+        } finally {
+            try {
+                r.release();
+            } catch (Exception ignored) {
+            }
+        }
+        if (frame == null) throw new IOException("Couldn't grab that frame");
+        int dot = item.name.lastIndexOf('.');
+        String base = dot > 0 ? item.name.substring(0, dot) : item.name;
+        String name = base + "_frame_" + (positionMs / 1000) + "s.jpg";
+        saveBitmap(frame, name);
+        frame.recycle();
+        return name;
+    }
+
+    @SuppressWarnings("deprecation")
+    private void saveBitmap(Bitmap bitmap, String name) throws IOException {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentValues values = new ContentValues();
+            values.put(MediaStore.MediaColumns.DISPLAY_NAME, name);
+            values.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg");
+            values.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/" + SAVE_FOLDER);
+            values.put(MediaStore.MediaColumns.IS_PENDING, 1);
+            Uri target = resolver.insert(MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values);
+            if (target == null) throw new IOException("Couldn't create the file in your gallery");
+            try (OutputStream out = resolver.openOutputStream(target)) {
+                if (out == null || !bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)) {
+                    throw new IOException("Couldn't write the picture");
+                }
+            } catch (IOException | RuntimeException e) {
+                resolver.delete(target, null, null);
+                throw e;
+            }
+            values.clear();
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0);
+            resolver.update(target, values, null, null);
+        } else {
+            File dir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), SAVE_FOLDER);
+            if (!dir.exists() && !dir.mkdirs()) throw new IOException("Couldn't create the " + SAVE_FOLDER + " folder");
+            File file = new File(dir, name);
+            try (OutputStream out = new FileOutputStream(file)) {
+                bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out);
+            }
+            scanAndWait(file, "image/jpeg");
+        }
+    }
+
+    /** Saves every status (from folders the user granted) that isn't saved yet. Returns how many. */
+    public int autoSaveNew() {
+        Set<String> saved = new HashSet<>();
+        for (StatusItem it : loadSaved()) saved.add(it.name);
+        int count = 0;
+        for (StatusSource source : StatusSource.values()) {
+            if (accessUri(source) == null) continue;
+            for (StatusItem item : loadStatuses(source)) {
+                if (saved.contains(item.name)) continue;
+                try {
+                    save(item);
+                    saved.add(item.name);
+                    count++;
+                } catch (Exception ignored) {
+                    // Skip this one; it may have just expired.
+                }
+            }
+        }
+        return count;
     }
 
     // ---------------- Helpers ----------------
