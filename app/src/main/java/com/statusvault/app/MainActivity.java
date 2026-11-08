@@ -338,7 +338,7 @@ public class MainActivity extends BaseActivity {
         float radius = dp(31);
         android.graphics.drawable.GradientDrawable edge = new android.graphics.drawable.GradientDrawable(
                 android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{(palette.primary & 0x00FFFFFF) | 0xB3000000, (palette.secondary & 0x00FFFFFF) | 0xB3000000});
+                new int[]{(palette.primary & 0x00FFFFFF) | 0x73000000, (palette.secondary & 0x00FFFFFF) | 0x73000000});
         edge.setCornerRadius(radius);
         android.graphics.drawable.GradientDrawable fill = new android.graphics.drawable.GradientDrawable();
         fill.setColor((getColor(R.color.surface) & 0x00FFFFFF) | 0xF7000000);
@@ -364,7 +364,7 @@ public class MainActivity extends BaseActivity {
             navIndicator.setOutlineSpotShadowColor(palette.primary);
             navIndicator.setOutlineAmbientShadowColor(palette.secondary);
         }
-        navIndicator.setElevation(dp(6));
+        navIndicator.setElevation(dp(3));
         navTabs.setElevation(dp(8));   // keep icons/labels above the glowing pill
         navActions.setElevation(dp(8));
         saveAll.setBackground(palette.rounded(palette.primary, 18));
@@ -821,9 +821,9 @@ public class MainActivity extends BaseActivity {
                 floatingBar.setLayoutParams(lp);
                 // Glow sits behind the bar, a little larger so its blur spills out softly.
                 FrameLayout.LayoutParams glp = (FrameLayout.LayoutParams) barGlow.getLayoutParams();
-                glp.width = lp.width + dp(56);
-                glp.height = dp(62 + 56);
-                glp.bottomMargin = lp.bottomMargin - dp(28) + dp(4); // nudged down: light from below
+                glp.width = lp.width + dp(40);
+                glp.height = dp(62 + 40);
+                glp.bottomMargin = lp.bottomMargin - dp(20) + dp(4); // nudged down: light from below
                 glp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
                 barGlow.setLayoutParams(glp);
                 // Let the grid scroll under the floating bar, but end above it.

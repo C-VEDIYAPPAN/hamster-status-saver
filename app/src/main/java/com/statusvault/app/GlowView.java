@@ -24,7 +24,7 @@ public class GlowView extends View {
         super(context, attrs);
         density = context.getResources().getDisplayMetrics().density;
         setLayerType(LAYER_TYPE_SOFTWARE, null); // BlurMaskFilter needs a software layer
-        paint.setMaskFilter(new BlurMaskFilter(18 * density, BlurMaskFilter.Blur.NORMAL));
+        paint.setMaskFilter(new BlurMaskFilter(14 * density, BlurMaskFilter.Blur.NORMAL));
     }
 
     public void setColors(int a, int b) {
@@ -35,10 +35,10 @@ public class GlowView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
-        float blur = 20 * density;
+        float blur = 16 * density;
         rect.set(blur, blur, getWidth() - blur, getHeight() - blur);
         paint.setShader(new LinearGradient(rect.left, 0, rect.right, 0,
-                (colorA & 0x00FFFFFF) | 0x8C000000, (colorB & 0x00FFFFFF) | 0x8C000000, Shader.TileMode.CLAMP));
+                (colorA & 0x00FFFFFF) | 0x47000000, (colorB & 0x00FFFFFF) | 0x47000000, Shader.TileMode.CLAMP));
         float r = rect.height() / 2f;
         canvas.drawRoundRect(rect, r, r, paint);
     }
@@ -46,8 +46,8 @@ public class GlowView extends View {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
-        breath = ValueAnimator.ofFloat(0.55f, 1f);
-        breath.setDuration(2600);
+        breath = ValueAnimator.ofFloat(0.6f, 0.9f);
+        breath.setDuration(3200);
         breath.setRepeatMode(ValueAnimator.REVERSE);
         breath.setRepeatCount(ValueAnimator.INFINITE);
         breath.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
