@@ -5,7 +5,7 @@ Plain Java on the Android framework — **no libraries**, so the APK is under 10
 
 ## Install
 
-1. Copy `StatusVault-v2.5.apk` to your phone and open it.
+1. Copy `StatusVault-v2.6.apk` to your phone and open it.
 2. Allow "Install unknown apps" for your file manager or browser when Android asks.
 3. Open **Status Vault** → tap **Grant access** → on the folder screen tap **Use this folder → Allow**.
 
@@ -37,7 +37,7 @@ and WhatsApp deletes them after 24 hours.
 - No internet permission — nothing leaves the phone
 
 **Settings** — live preview card, 13 accent colours plus Wallpaper colours (Android 12+),
-Light / Dark / System theme with a circular reveal, grid slider, sort, open-on tab, badges,
+Light / Dark / System theme with a soft crossfade, grid slider, sort, open-on tab, badges,
 autoplay / start-muted videos, auto-save, app lock, storage clean-up, folder reset, reset settings.
 
 ## Build
