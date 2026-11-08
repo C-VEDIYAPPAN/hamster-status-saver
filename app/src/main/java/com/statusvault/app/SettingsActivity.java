@@ -340,6 +340,16 @@ public class SettingsActivity extends BaseActivity {
         TextView note = text("Only save statuses you have permission to keep.", 13, R.color.on_surface_variant, false);
         note.setPadding(0, 0, 0, dp(6));
         about.addView(note);
+        action(about, "Open source \u00b7 GPL-3.0", "View the code on GitHub", new Runnable() {
+            public void run() {
+                try {
+                    startActivity(new android.content.Intent(android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("https://github.com/C-VEDIYAPPAN/StatusVault")));
+                } catch (android.content.ActivityNotFoundException e) {
+                    notice.show("No browser found", Notice.ERROR);
+                }
+            }
+        });
         action(about, "Reset settings", "Back to the default look and options. Your saved statuses aren't touched.", new Runnable() {
             public void run() {
                 confirmReset();

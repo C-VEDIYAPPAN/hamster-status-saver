@@ -5,7 +5,7 @@ Plain Java on the Android framework — **no libraries**, so the APK is under 10
 
 ## Install
 
-1. Copy `StatusVault-v2.6.apk` to your phone and open it.
+1. Copy `StatusVault-v2.7.apk` to your phone and open it.
 2. Allow "Install unknown apps" for your file manager or browser when Android asks.
 3. Open **Status Vault** → tap **Grant access** → on the folder screen tap **Use this folder → Allow**.
 
@@ -92,3 +92,13 @@ including a monochrome version for Android 13+ themed icons.
 
 Don't put "WhatsApp" in the app name, icon or store title — Google removes apps that do.
 "Works with WhatsApp" in the description is the usual approach.
+
+## License
+
+Status Vault is free software: you can redistribute it and/or modify it under the terms of the
+[GNU General Public License v3.0](LICENSE) as published by the Free Software Foundation.
+Anyone who publishes a modified version must share its source code under the same licence.
+
+Copyright © 2026 Vediyappan
+
+Status Vault is not affiliated with, endorsed by, or connected to WhatsApp or Meta.
