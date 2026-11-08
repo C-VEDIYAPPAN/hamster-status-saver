@@ -4,6 +4,7 @@ import android.content.Context;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.widget.Switch;
 
 /** Accent colours chosen in Settings, resolved for the current light/dark mode. */
@@ -77,9 +78,55 @@ final class Palette {
         return d;
     }
 
-    void tint(Switch sw, int offTrack) {
-        int[][] states = {{android.R.attr.state_checked}, {}};
-        sw.setThumbTintList(new ColorStateList(states, new int[]{primary, dark ? 0xFF8E9A99 : 0xFFFFFFFF}));
-        sw.setTrackTintList(new ColorStateList(states, new int[]{container, offTrack}));
+    /**
+     * Material 3 style switch: a filled accent track with a light thumb when on, and an outlined
+     * track with a grey thumb when off. Drawn by us so it stays clearly visible in dark mode.
+     */
+    void styleSwitch(Switch sw) {
+        int trackW = Math.round(52 * density), trackH = Math.round(32 * density);
+        int outline = dark ? 0xFF8B9796 : 0xFF6F7979;
+        int offTrack = dark ? 0xFF2B3534 : 0xFFE3ECEB;
+
+        GradientDrawable trackOn = new GradientDrawable();
+        trackOn.setColor(primary);
+        trackOn.setCornerRadius(trackH / 2f);
+        trackOn.setSize(trackW, trackH);
+        GradientDrawable trackOff = new GradientDrawable();
+        trackOff.setColor(offTrack);
+        trackOff.setStroke(Math.round(2 * density), outline);
+        trackOff.setCornerRadius(trackH / 2f);
+        trackOff.setSize(trackW, trackH);
+        StateListDrawable track = new StateListDrawable();
+        track.setEnterFadeDuration(150);
+        track.setExitFadeDuration(150);
+        track.addState(new int[]{android.R.attr.state_checked}, trackOn);
+        track.addState(new int[]{}, trackOff);
+
+        // Thumb: big light dot when on, smaller outline-coloured dot when off.
+        StateListDrawable thumb = new StateListDrawable();
+        thumb.setEnterFadeDuration(150);
+        thumb.setExitFadeDuration(150);
+        thumb.addState(new int[]{android.R.attr.state_checked}, thumbDot(onPrimary, 24, trackH));
+        thumb.addState(new int[]{}, thumbDot(outline, 16, trackH));
+
+        sw.setThumbTintList(null);
+        sw.setTrackTintList(null);
+        sw.setTrackDrawable(track);
+        sw.setThumbDrawable(thumb);
+        sw.setSwitchMinWidth(trackW);
+        sw.setShowText(false);
+        sw.refreshDrawableState();
+    }
+
+    /** A dot of [dotDp] centred in a square cell the height of the track. */
+    private android.graphics.drawable.Drawable thumbDot(int color, int dotDp, int cell) {
+        GradientDrawable dot = new GradientDrawable();
+        dot.setShape(GradientDrawable.OVAL);
+        dot.setColor(color);
+        int d = Math.round(dotDp * density);
+        int inset = (cell - d) / 2;
+        dot.setSize(d, d);
+        android.graphics.drawable.InsetDrawable in = new android.graphics.drawable.InsetDrawable(dot, inset);
+        return in;
     }
 }

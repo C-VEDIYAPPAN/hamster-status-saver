@@ -148,7 +148,7 @@ public class SettingsActivity extends BaseActivity {
                 prefs.setColumns(progress + 2);
                 s.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK);
                 updateColumnsLabel();
-                renderPreview();
+                updatePreviewColumns();
             }
 
             @Override public void onStartTrackingTouch(SeekBar s) {}
@@ -283,91 +283,127 @@ public class SettingsActivity extends BaseActivity {
 
     // ---------------- Live preview ----------------
 
+    private LinearLayout previewCard, previewTiles;
+    private TextView previewChipA, previewChipB, previewButton;
+
+    /** Builds the preview once, then only restyles it, so its size never jumps. */
     private void renderPreview() {
-        previewHost.removeAllViews();
-        LinearLayout card = new LinearLayout(this);
-        card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(dp(14), dp(14), dp(14), dp(14));
-        GradientDrawable bg = pal.rounded(getColor(R.color.surface), 20);
-        bg.setStroke(dp(1), getColor(R.color.surface_variant));
-        card.setBackground(bg);
+        if (previewCard == null) {
+            previewCard = new LinearLayout(this);
+            previewCard.setOrientation(LinearLayout.VERTICAL);
+            previewCard.setPadding(dp(14), dp(14), dp(14), dp(14));
 
-        LinearLayout chips = new LinearLayout(this);
-        TextView chipA = text("All · 12", 13, 0, false);
-        chipA.setTextColor(pal.onContainer);
-        chipA.setBackground(pal.rounded(pal.container, 14));
-        chipA.setPadding(dp(12), dp(5), dp(12), dp(5));
-        chips.addView(chipA);
-        TextView chipB = text("Videos · 4", 13, R.color.on_surface, false);
-        chipB.setBackground(pal.outlined(getColor(R.color.outline), 14));
-        chipB.setPadding(dp(12), dp(5), dp(12), dp(5));
-        LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        cp.leftMargin = dp(8);
-        chips.addView(chipB, cp);
-        TextView live = text("Live preview", 12, R.color.on_surface_variant, false);
-        live.setGravity(Gravity.END);
-        chips.addView(live, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        card.addView(chips);
+            LinearLayout chips = new LinearLayout(this);
+            chips.setGravity(Gravity.CENTER_VERTICAL);
+            previewChipA = text("All · 12", 13, 0, false);
+            previewChipA.setPadding(dp(12), dp(5), dp(12), dp(5));
+            chips.addView(previewChipA);
+            previewChipB = text("Videos · 4", 13, R.color.on_surface, false);
+            previewChipB.setPadding(dp(12), dp(5), dp(12), dp(5));
+            LinearLayout.LayoutParams cp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            cp.leftMargin = dp(8);
+            chips.addView(previewChipB, cp);
+            TextView live = text("Live preview", 12, R.color.on_surface_variant, false);
+            live.setGravity(Gravity.END);
+            chips.addView(live, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            previewCard.addView(chips);
 
-        int cols = Math.max(2, Math.min(5, prefs.columns()));
-        int rows = cols <= 3 ? 1 : 2;
-        int[] shades = {0x33, 0x22, 0x44, 0x2A, 0x3A};
-        for (int r = 0; r < rows; r++) {
-            LinearLayout line = new LinearLayout(this);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-            lp.topMargin = dp(r == 0 ? 12 : 6);
-            for (int c = 0; c < cols; c++) {
-                int i = r * cols + c;
-                FrameLayout tile = new AspectFrameLayout(this, null);
-                tile.setBackground(pal.rounded((pal.primary & 0x00FFFFFF) | (shades[i % shades.length] << 24), 10));
-                if (prefs.newBadges() && i % 3 == 0) {
-                    TextView pill = text("NEW", 9, 0, true);
-                    pill.setTextColor(pal.onPrimary);
-                    pill.setBackground(pal.rounded(pal.primary, 8));
-                    pill.setPadding(dp(5), dp(1), dp(5), dp(1));
-                    FrameLayout.LayoutParams pp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
-                    pp.setMargins(dp(4), dp(4), 0, 0);
-                    tile.addView(pill, pp);
-                }
-                if (prefs.timeLeft() && i % 2 == 1) {
-                    TextView t = text((23 - i * 3) + "h", 9, 0, false);
-                    t.setTextColor(0xFFFFFFFF);
-                    t.setBackground(pal.rounded(0x99000000, 8));
-                    t.setPadding(dp(5), dp(1), dp(5), dp(1));
-                    FrameLayout.LayoutParams tp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START);
-                    tp.setMargins(dp(4), 0, 0, dp(4));
-                    tile.addView(t, tp);
-                }
-                ImageView save = new ImageView(this);
-                save.setImageResource(R.drawable.ic_download);
-                save.setImageTintList(ColorStateList.valueOf(pal.onContainer));
-                save.setBackground(Palette.oval(pal.container));
-                save.setPadding(dp(3), dp(3), dp(3), dp(3));
-                int s = cols >= 5 ? dp(16) : dp(20);
-                FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(s, s, Gravity.BOTTOM | Gravity.END);
-                sp.setMargins(0, 0, dp(4), dp(4));
-                tile.addView(save, sp);
-
-                LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
-                if (c > 0) tl.leftMargin = dp(6);
-                line.addView(tile, tl);
+            // Fixed-height tile area: two rows whose tiles resize smoothly with the column count.
+            previewTiles = new LinearLayout(this);
+            previewTiles.setOrientation(LinearLayout.VERTICAL);
+            for (int r = 0; r < 2; r++) {
+                LinearLayout row = new LinearLayout(this);
+                LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1);
+                if (r > 0) rp.topMargin = dp(6);
+                previewTiles.addView(row, rp);
             }
-            card.addView(line, lp);
+            LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(176));
+            tp.topMargin = dp(12);
+            previewCard.addView(previewTiles, tp);
+
+            previewButton = text("Grant access", 14, 0, true);
+            previewButton.setGravity(Gravity.CENTER);
+            previewButton.setPadding(dp(22), 0, dp(22), 0);
+            LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
+            bp.topMargin = dp(12);
+            bp.gravity = Gravity.CENTER_HORIZONTAL;
+            previewCard.addView(previewButton, bp);
+            previewHost.addView(previewCard);
         }
 
-        TextView button = text("Grant access", 14, 0, true);
-        button.setGravity(Gravity.CENTER);
-        button.setTextColor(pal.onPrimary);
-        button.setBackground(pal.rounded(pal.primary, 18));
-        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(36));
-        bp.topMargin = dp(12);
-        bp.gravity = Gravity.CENTER_HORIZONTAL;
-        button.setPadding(dp(22), 0, dp(22), 0);
-        card.addView(button, bp);
+        GradientDrawable bg = pal.rounded(getColor(R.color.surface), 20);
+        bg.setStroke(dp(1), getColor(R.color.surface_variant));
+        previewCard.setBackground(bg);
+        previewChipA.setTextColor(pal.onContainer);
+        previewChipA.setBackground(pal.rounded(pal.container, 14));
+        previewChipB.setBackground(pal.outlined(getColor(R.color.outline), 14));
+        previewButton.setTextColor(pal.onPrimary);
+        previewButton.setBackground(pal.rounded(pal.primary, 18));
 
-        card.setAlpha(0.6f);
-        previewHost.addView(card);
-        card.animate().alpha(1f).setDuration(180).start();
+        // Restyle tiles in place (accent / badge changes)
+        int cols = previewColumns();
+        for (int r = 0; r < 2; r++) {
+            LinearLayout row = (LinearLayout) previewTiles.getChildAt(r);
+            row.removeAllViews();
+            for (int c = 0; c < cols; c++) addPreviewTile(row, r * 5 + c, c > 0);
+        }
+    }
+
+    /** Called while dragging the grid slider: tiles slide/resize into the new layout. */
+    private void updatePreviewColumns() {
+        int cols = previewColumns();
+        android.transition.AutoTransition t = new android.transition.AutoTransition();
+        t.setDuration(220);
+        t.setInterpolator(new android.view.animation.DecelerateInterpolator());
+        android.transition.TransitionManager.beginDelayedTransition(previewTiles, t);
+        for (int r = 0; r < 2; r++) {
+            LinearLayout row = (LinearLayout) previewTiles.getChildAt(r);
+            while (row.getChildCount() > cols) row.removeViewAt(row.getChildCount() - 1);
+            while (row.getChildCount() < cols) {
+                int c = row.getChildCount();
+                addPreviewTile(row, r * 5 + c, c > 0);
+            }
+        }
+    }
+
+    private int previewColumns() {
+        return Math.max(2, Math.min(5, prefs.columns()));
+    }
+
+    private void addPreviewTile(LinearLayout row, int i, boolean gap) {
+        int[] shades = {0x33, 0x22, 0x44, 0x2A, 0x3A};
+        FrameLayout tile = new FrameLayout(this);
+        tile.setBackground(pal.rounded((pal.primary & 0x00FFFFFF) | (shades[i % shades.length] << 24), 10));
+        if (prefs.newBadges() && i % 3 == 0) {
+            TextView pill = text("NEW", 9, 0, true);
+            pill.setTextColor(pal.onPrimary);
+            pill.setBackground(pal.rounded(pal.primary, 8));
+            pill.setPadding(dp(5), dp(1), dp(5), dp(1));
+            FrameLayout.LayoutParams pp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP | Gravity.START);
+            pp.setMargins(dp(4), dp(4), 0, 0);
+            tile.addView(pill, pp);
+        }
+        if (prefs.timeLeft() && i % 2 == 1) {
+            TextView t = text(Math.max(1, 23 - i * 2) + "h", 9, 0, false);
+            t.setTextColor(0xFFFFFFFF);
+            t.setBackground(pal.rounded(0x99000000, 8));
+            t.setPadding(dp(5), dp(1), dp(5), dp(1));
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM | Gravity.START);
+            lp.setMargins(dp(4), 0, 0, dp(4));
+            tile.addView(t, lp);
+        }
+        ImageView save = new ImageView(this);
+        save.setImageResource(R.drawable.ic_download);
+        save.setImageTintList(ColorStateList.valueOf(pal.onContainer));
+        save.setBackground(Palette.oval(pal.container));
+        save.setPadding(dp(3), dp(3), dp(3), dp(3));
+        FrameLayout.LayoutParams sp = new FrameLayout.LayoutParams(dp(18), dp(18), Gravity.BOTTOM | Gravity.END);
+        sp.setMargins(0, 0, dp(4), dp(4));
+        tile.addView(save, sp);
+
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1);
+        if (gap) tl.leftMargin = dp(6);
+        row.addView(tile, tl);
     }
 
     private void renderSwatches() {
@@ -417,7 +453,7 @@ public class SettingsActivity extends BaseActivity {
     }
 
     private void restyleControls() {
-        for (Switch s : switches) pal.tint(s, getColor(R.color.surface_variant));
+        for (Switch s : switches) pal.styleSwitch(s);
         for (int i = 0; i < segments.size(); i++) styleSegment(segments.get(i), segmentSelections.get(i)[0]);
         columnsSeek.setProgressTintList(ColorStateList.valueOf(pal.primary));
         columnsSeek.setThumbTintList(ColorStateList.valueOf(pal.primary));
@@ -556,7 +592,7 @@ public class SettingsActivity extends BaseActivity {
         row.addView(texts, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
         final Switch sw = new Switch(this);
         sw.setChecked(checked);
-        pal.tint(sw, getColor(R.color.surface_variant));
+        pal.styleSwitch(sw);
         sw.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton b, boolean on) {

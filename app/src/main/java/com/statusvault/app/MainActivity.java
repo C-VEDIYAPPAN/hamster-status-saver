@@ -14,7 +14,17 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.DocumentsContract;
 import android.text.format.Formatter;
+import android.graphics.Color;
+import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
+import android.view.WindowInsets;
+import android.view.animation.AlphaAnimation;
+import android.view.animation.AnimationSet;
+import android.view.animation.DecelerateInterpolator;
+import android.view.animation.LayoutAnimationController;
+import android.view.animation.TranslateAnimation;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -77,7 +87,14 @@ public class MainActivity extends BaseActivity {
     private int loadGeneration = 0;
 
     // Views
-    private TextView[] tabs;
+    private final View[] navPills = new View[3];
+    private final ImageView[] navIcons = new ImageView[3];
+    private final TextView[] navLabels = new TextView[3];
+    private final TextView[] navBadges = new TextView[3];
+    private LinearLayout nav;
+    private int appliedColumns;
+    /** Section the nav highlight currently shows (null until first drawn). */
+    private Section navSection;
     private TextView chipAll, chipPhotos, chipVideos, stats, selCount;
     private View filters, empty, header, selectionBar;
     private View selSave, selRepost, selDelete;
@@ -104,20 +121,9 @@ public class MainActivity extends BaseActivity {
         }
         if (getIntent().getBooleanExtra(EXTRA_OPEN_SAVED, false)) section = Section.SAVED;
 
-        tabs = new TextView[]{
-                (TextView) findViewById(R.id.tab_whatsapp),
-                (TextView) findViewById(R.id.tab_business),
-                (TextView) findViewById(R.id.tab_saved),
-        };
-        for (int i = 0; i < tabs.length; i++) {
-            final Section s = Section.values()[i];
-            tabs[i].setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    switchSection(s);
-                }
-            });
-        }
+        nav = (LinearLayout) findViewById(R.id.bottom_nav);
+        buildNav();
+        applyInsets();
 
         chipAll = (TextView) findViewById(R.id.chip_all);
         chipPhotos = (TextView) findViewById(R.id.chip_photos);
@@ -156,6 +162,8 @@ public class MainActivity extends BaseActivity {
 
         grid = (GridView) findViewById(R.id.grid);
         grid.setAdapter(adapter);
+        grid.setLayoutAnimation(tileEntrance());
+        appliedColumns = prefs.columns();
         grid.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
@@ -192,6 +200,10 @@ public class MainActivity extends BaseActivity {
         if (prefs.theme() != appliedTheme) { // changed in Settings
             recreate();
             return;
+        }
+        if (prefs.columns() != appliedColumns) { // grid size changed in Settings
+            appliedColumns = prefs.columns();
+            animateGrid();
         }
         // New statuses appear whenever the user views them in WhatsApp, so reload on return.
         refresh();
@@ -305,12 +317,7 @@ public class MainActivity extends BaseActivity {
         progress.setIndeterminateTintList(ColorStateList.valueOf(palette.primary));
         grid.setNumColumns(Math.max(2, Math.min(5, prefs.columns())));
 
-        for (int i = 0; i < tabs.length; i++) {
-            boolean sel = Section.values()[i] == section;
-            tabs[i].setBackgroundResource(sel ? R.drawable.bg_tab_selected : 0);
-            tabs[i].setTextColor(getColor(sel ? R.color.on_surface : R.color.on_surface_variant));
-            tabs[i].setElevation(sel ? dp(1) : 0);
-        }
+        styleNav(false);
 
         List<StatusItem> all = sorted(items.get(section));
         int photos = 0, videos = 0;
@@ -398,6 +405,12 @@ public class MainActivity extends BaseActivity {
     }
 
     private void showEmpty(int icon, String title, String body, String action, View.OnClickListener onAction) {
+        if (empty.getVisibility() != View.VISIBLE || !title.contentEquals(emptyTitle.getText())) {
+            empty.setAlpha(0f);
+            empty.setTranslationY(dp(12));
+            empty.animate().alpha(1f).translationY(0).setDuration(220)
+                    .setInterpolator(new DecelerateInterpolator()).start();
+        }
         empty.setVisibility(View.VISIBLE);
         emptyIcon.setImageResource(icon);
         emptyIcon.setImageTintList(ColorStateList.valueOf(palette.primary));
@@ -418,7 +431,9 @@ public class MainActivity extends BaseActivity {
         chip.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (filter == f) return;
                 filter = f;
+                animateGrid();
                 render();
             }
         });
@@ -435,8 +450,163 @@ public class MainActivity extends BaseActivity {
         if (section == s) return;
         section = s;
         selected.clear();
+        animateGrid();
+        styleNav(true);
         render();
         grid.setSelection(0);
+    }
+
+    // ---------------- Bottom navigation ----------------
+
+    private void buildNav() {
+        int[] icons = {R.drawable.ic_nav_chat, R.drawable.ic_nav_store, R.drawable.ic_nav_saved};
+        String[] labels = {"WhatsApp", "Business", "Saved"};
+        for (int i = 0; i < 3; i++) {
+            final Section s = Section.values()[i];
+            LinearLayout item = new LinearLayout(this);
+            item.setOrientation(LinearLayout.VERTICAL);
+            item.setGravity(Gravity.CENTER_HORIZONTAL);
+            item.setPadding(0, dp(10), 0, dp(12));
+            item.setContentDescription(labels[i]);
+            item.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    v.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
+                    if (section == s) grid.smoothScrollToPosition(0); // tap again: back to top
+                    else switchSection(s);
+                }
+            });
+
+            FrameLayout iconBox = new FrameLayout(this);
+            View pill = new View(this);
+            iconBox.addView(pill, new FrameLayout.LayoutParams(dp(64), dp(32), Gravity.CENTER));
+            ImageView icon = new ImageView(this);
+            icon.setImageResource(icons[i]);
+            iconBox.addView(icon, new FrameLayout.LayoutParams(dp(24), dp(24), Gravity.CENTER));
+            TextView badge = new TextView(this);
+            badge.setTextSize(10);
+            badge.setGravity(Gravity.CENTER);
+            badge.setMinWidth(dp(18));
+            badge.setPadding(dp(4), 0, dp(4), 0);
+            badge.setVisibility(View.GONE);
+            FrameLayout.LayoutParams bp = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, dp(18), Gravity.TOP | Gravity.END);
+            bp.setMargins(0, dp(-2), dp(6), 0);
+            iconBox.addView(badge, bp);
+            iconBox.setClipChildren(false);
+            item.addView(iconBox, new LinearLayout.LayoutParams(dp(64), dp(32)));
+
+            TextView label = new TextView(this);
+            label.setText(labels[i]);
+            label.setTextSize(12);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = dp(4);
+            item.addView(label, lp);
+
+            nav.addView(item, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            navPills[i] = pill;
+            navIcons[i] = icon;
+            navLabels[i] = label;
+            navBadges[i] = badge;
+        }
+        nav.setClipChildren(false);
+    }
+
+    /** Highlights the current section; the pill grows in when [animate] is true. */
+    private void styleNav(boolean animate) {
+        if (palette == null) palette = new Palette(this);
+        for (int i = 0; i < 3; i++) {
+            boolean sel = Section.values()[i] == section;
+            View pill = navPills[i];
+            pill.setBackground(palette.rounded(palette.container, 16));
+            if (navSection == section) {
+                // Highlight already in place (or animating) — leave it alone.
+            } else if (animate) {
+                pill.animate().cancel();
+                if (sel) {
+                    pill.setScaleX(0.4f);
+                    pill.setAlpha(0f);
+                    pill.animate().scaleX(1f).alpha(1f).setDuration(240)
+                            .setInterpolator(new DecelerateInterpolator(2f)).start();
+                } else {
+                    pill.animate().scaleX(0.4f).alpha(0f).setDuration(160).start();
+                }
+            } else {
+                pill.setScaleX(sel ? 1f : 0.4f);
+                pill.setAlpha(sel ? 1f : 0f);
+            }
+            navIcons[i].setImageTintList(ColorStateList.valueOf(
+                    sel ? palette.onContainer : getColor(R.color.on_surface_variant)));
+            navLabels[i].setTextColor(getColor(sel ? R.color.on_surface : R.color.on_surface_variant));
+            navLabels[i].setTypeface(android.graphics.Typeface.create(
+                    sel ? "sans-serif-medium" : "sans-serif", android.graphics.Typeface.NORMAL));
+
+            // Count of unopened statuses on the WhatsApp / Business tabs
+            int fresh = 0;
+            if (i < 2 && prefs.newBadges()) {
+                for (StatusItem it : items.get(Section.values()[i])) if (!seen.contains(it.name)) fresh++;
+            }
+            TextView badge = navBadges[i];
+            badge.setVisibility(fresh > 0 ? View.VISIBLE : View.GONE);
+            if (fresh > 0) {
+                badge.setText(fresh > 99 ? "99+" : String.valueOf(fresh));
+                badge.setTextColor(palette.onPrimary);
+                badge.setBackground(palette.rounded(palette.primary, 9));
+            }
+        }
+        navSection = section;
+    }
+
+    // ---------------- Motion ----------------
+
+    /** Tiles fade and rise in, slightly staggered. */
+    private LayoutAnimationController tileEntrance() {
+        AnimationSet set = new AnimationSet(true);
+        AlphaAnimation fade = new AlphaAnimation(0f, 1f);
+        TranslateAnimation rise = new TranslateAnimation(0, 0, dp(16), 0);
+        set.addAnimation(fade);
+        set.addAnimation(rise);
+        set.setDuration(240);
+        set.setInterpolator(new DecelerateInterpolator(1.5f));
+        LayoutAnimationController c = new LayoutAnimationController(set, 0.06f);
+        c.setOrder(LayoutAnimationController.ORDER_NORMAL);
+        return c;
+    }
+
+    private void animateGrid() {
+        grid.scheduleLayoutAnimation();
+    }
+
+    /** Draws behind the system bars; the header gets the status-bar inset, the bottom bar the nav-bar inset. */
+    @SuppressWarnings("deprecation")
+    private void applyInsets() {
+        final View root = findViewById(R.id.root);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                getWindow().setDecorFitsSystemWindows(false);
+            } else {
+                View decor = getWindow().getDecorView();
+                decor.setSystemUiVisibility(decor.getSystemUiVisibility()
+                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+            }
+            getWindow().setStatusBarColor(Color.TRANSPARENT);
+            getWindow().setNavigationBarColor(Color.TRANSPARENT);
+            root.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+                @Override
+                public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                    root.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                            insets.getSystemWindowInsetRight(), 0);
+                    nav.setPadding(0, 0, 0, insets.getSystemWindowInsetBottom());
+                    return insets;
+                }
+            });
+            root.requestApplyInsets();
+        } else {
+            // Android 8–9: keep classic bars, coloured to match the bottom bar.
+            root.setFitsSystemWindows(true);
+            getWindow().setNavigationBarColor(getColor(R.color.surface));
+        }
     }
 
     // ---------------- Selection ----------------
@@ -746,8 +916,8 @@ public class MainActivity extends BaseActivity {
             ImageView check = (ImageView) v.findViewById(R.id.sel_check);
             saveBtn.setFocusable(false); // ImageButton forces focusable=true, which would block grid item clicks
 
-            int cols = Math.max(2, Math.min(5, prefs.columns()));
-            ThumbnailLoader.get(MainActivity.this).load(item, thumb, cols <= 2 ? dp(260) : dp(200));
+            // One size for every grid setting, so changing columns reuses cached thumbnails.
+            ThumbnailLoader.get(MainActivity.this).load(item, thumb, dp(240));
             play.setVisibility(item.isVideo() ? View.VISIBLE : View.GONE);
 
             boolean isStatus = section != Section.SAVED;

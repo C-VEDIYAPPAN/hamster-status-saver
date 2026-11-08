@@ -52,6 +52,8 @@ public final class ThumbnailLoader {
         view.setTag(R.id.thumb, key);
         Bitmap cached = cache.get(key);
         if (cached != null) {
+            view.animate().cancel();
+            view.setAlpha(1f);
             view.setImageBitmap(cached);
             return;
         }
@@ -64,7 +66,11 @@ public final class ThumbnailLoader {
                 main.post(new Runnable() {
                     @Override
                     public void run() {
-                        if (key.equals(view.getTag(R.id.thumb)) && bmp != null) view.setImageBitmap(bmp);
+                        if (key.equals(view.getTag(R.id.thumb)) && bmp != null) {
+                            view.setAlpha(0f);
+                            view.setImageBitmap(bmp);
+                            view.animate().alpha(1f).setDuration(180).start(); // soft fade-in, no pop
+                        }
                     }
                 });
             }

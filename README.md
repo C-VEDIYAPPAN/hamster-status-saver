@@ -5,7 +5,7 @@ Plain Java on the Android framework — **no libraries**, so the APK is under 10
 
 ## Install
 
-1. Copy `StatusVault-v1.1.apk` to your phone and open it.
+1. Copy `StatusVault-v1.2.apk` to your phone and open it.
 2. Allow "Install unknown apps" for your file manager or browser when Android asks.
 3. Open **Status Vault** → tap **Grant access** → on the folder screen tap **Use this folder → Allow**.
 
