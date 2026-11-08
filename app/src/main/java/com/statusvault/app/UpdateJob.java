@@ -2,14 +2,8 @@ package com.statusvault.app;
 
 import android.app.job.JobParameters;
 import android.app.job.JobService;
-import android.os.Build;
 
-import java.io.File;
-
-/**
- * Twice-a-day background check. Downloads and verifies a new version; then installs it silently
- * when Android allows (Android 12+, after the first self-update), otherwise notifies the user.
- */
+/** Twice-a-day background check: notifies once per new version. */
 public class UpdateJob extends JobService {
 
     @Override
@@ -18,20 +12,14 @@ public class UpdateJob extends JobService {
             @Override
             public void run() {
                 try {
-                    File apk = Updater.checkAndDownload(UpdateJob.this);
-                    if (apk != null) {
-                        StatusVaultApp app = StatusVaultApp.get();
-                        boolean appInUse = app != null && app.isForeground();
-                        if (!appInUse && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                                && Updater.canInstall(UpdateJob.this)) {
-                            // Silent if Android allows; if not, InstallReceiver turns it into a notification.
-                            Updater.commit(UpdateJob.this, apk);
-                        } else {
-                            Updater.notifyReady(UpdateJob.this, Updater.versionOf(apk));
-                        }
+                    Updater.Release r = Updater.check(UpdateJob.this);
+                    Prefs prefs = new Prefs(UpdateJob.this);
+                    if (r != null && !r.version.equals(prefs.notifiedVersion())) {
+                        prefs.setNotifiedVersion(r.version); // don't repeat the same alert
+                        Updater.notifyAvailable(UpdateJob.this, r);
                     }
                 } catch (Exception ignored) {
-                    // No network, GitHub unavailable, etc. — try again next time.
+                    // offline or GitHub unavailable — try again next time
                 }
                 jobFinished(params, false);
             }

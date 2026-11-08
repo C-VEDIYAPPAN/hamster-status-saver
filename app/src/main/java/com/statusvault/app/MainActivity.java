@@ -62,7 +62,6 @@ public class MainActivity extends BaseActivity {
     enum Filter { ALL, PHOTOS, VIDEOS }
 
     static final String EXTRA_OPEN_SAVED = "open_saved";
-    static final String EXTRA_INSTALL_UPDATE = "install_update";
 
     private static final int REQ_PICK_FOLDER = 100; // + source ordinal
     private static final int REQ_LEGACY_STORAGE = 200;
@@ -240,7 +239,6 @@ public class MainActivity extends BaseActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         if (intent.getBooleanExtra(EXTRA_OPEN_SAVED, false)) switchSection(Section.SAVED);
-        if (intent.getBooleanExtra(EXTRA_INSTALL_UPDATE, false)) installReadyUpdate();
     }
 
     @Override
@@ -266,36 +264,27 @@ public class MainActivity extends BaseActivity {
 
     // ---------------- App updates ----------------
 
-    /** On open: finish a pending install, offer a downloaded update, or check GitHub (at most every 6h). */
+    /** On open: mention a known newer version, or check GitHub (at most every 6 hours). */
     private void handleUpdates() {
-        if (!Updater.available(this)) return;
-        if (getIntent().getBooleanExtra(EXTRA_INSTALL_UPDATE, false)) {
-            getIntent().removeExtra(EXTRA_INSTALL_UPDATE);
-            installReadyUpdate();
-            return;
-        }
-        if (prefs.pendingInstall() && Updater.canInstall(this)) { // back from "install unknown apps"
-            installReadyUpdate();
-            return;
-        }
-        final File ready = Updater.readyUpdate(this);
-        if (ready != null) {
-            offerUpdate(ready);
+        if (!Updater.available(this) || !prefs.autoUpdate()) return;
+        Updater.Release known = Updater.knownUpdate(this);
+        if (known != null) {
+            offerUpdate(known);
             return;
         }
         boolean due = System.currentTimeMillis() - prefs.lastUpdateCheck() > 6 * 3600_000L;
-        if (!prefs.autoUpdate() || !due || updateChecking) return;
+        if (!due || updateChecking) return;
         updateChecking = true;
         io.execute(new Runnable() {
             @Override
             public void run() {
-                File apk = null;
+                Updater.Release r = null;
                 try {
-                    apk = Updater.checkAndDownload(MainActivity.this);
+                    r = Updater.check(MainActivity.this);
                 } catch (Exception ignored) {
                     // offline or GitHub unavailable — try again later
                 }
-                final File found = apk;
+                final Updater.Release found = r;
                 main.post(new Runnable() {
                     @Override
                     public void run() {
@@ -307,21 +296,15 @@ public class MainActivity extends BaseActivity {
         });
     }
 
-    private void offerUpdate(final File apk) {
+    private void offerUpdate(final Updater.Release r) {
         if (updateOffered) return;
         updateOffered = true;
-        notice.show("Update " + Updater.versionOf(apk) + " is ready", Notice.SUCCESS, "Install", new Runnable() {
+        notice.show("Version " + r.version + " is available", Notice.SUCCESS, "Download", new Runnable() {
             @Override
             public void run() {
-                Updater.install(MainActivity.this, apk, notice);
+                Updater.download(MainActivity.this, r, notice);
             }
         });
-    }
-
-    private void installReadyUpdate() {
-        File apk = Updater.readyUpdate(this);
-        if (apk != null) Updater.install(this, apk, notice);
-        else prefs.setPendingInstall(false);
     }
 
     @Override

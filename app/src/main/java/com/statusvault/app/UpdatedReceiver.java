@@ -10,7 +10,8 @@ public class UpdatedReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context c, Intent intent) {
         if (!Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) return;
-        Updater.clean(c, null);
+        Updater.cleanLegacy(c);
+        new Prefs(c).setLatestVersion(null);
         Updater.schedule(c);
         AutoSaveJob.sync(c);
         Updater.notifyText(c, "Status Vault updated to " + Updater.currentVersion(c), "You're on the latest version.", null);

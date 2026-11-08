@@ -293,7 +293,7 @@ public class SettingsActivity extends BaseActivity {
         });
         privacy.addView(lockDelayGroup, segmentParams());
         lockDelayGroup.setAlpha(prefs.appLock() ? 1f : 0.45f);
-        TextView privacyNote = text("Everything stays on your phone. The app's only internet use is checking GitHub for updates, which you can turn off below.",
+        TextView privacyNote = text("Everything stays on your phone. The app's only internet use is checking GitHub for new versions, which you can turn off below.",
                 13, R.color.on_surface_variant, false);
         privacyNote.setPadding(0, dp(4), 0, dp(4));
         privacy.addView(privacyNote);
@@ -362,7 +362,7 @@ public class SettingsActivity extends BaseActivity {
     // ---------------- Updates ----------------
 
     private TextView updateStatus;
-    private View installRow;
+    private View downloadRow;
     private boolean checkingUpdate;
 
     private void buildUpdatesSection() {
@@ -384,9 +384,8 @@ public class SettingsActivity extends BaseActivity {
             card.addView(t);
             return;
         }
-        toggle(card, "Automatic updates",
-                "Checks GitHub about twice a day and downloads new versions in the background. "
-                        + "Android asks you to confirm the first install; later ones can be automatic (Android 12+).",
+        toggle(card, "Update alerts",
+                "Checks GitHub about twice a day and lets you know when a new version is out.",
                 prefs.autoUpdate(), new Toggle() {
                     @Override
                     public void changed(ToggleSwitch s, boolean on) {
@@ -399,10 +398,10 @@ public class SettingsActivity extends BaseActivity {
                 checkForUpdate();
             }
         });
-        installRow = actionView(card, "Install update", "A new version is downloaded and ready", new Runnable() {
+        downloadRow = actionView(card, "Download update", "", new Runnable() {
             public void run() {
-                File apk = Updater.readyUpdate(SettingsActivity.this);
-                if (apk != null) Updater.install(SettingsActivity.this, apk, notice);
+                Updater.Release r = Updater.knownUpdate(SettingsActivity.this);
+                if (r != null) Updater.download(SettingsActivity.this, r, notice);
                 else refreshUpdateStatus();
             }
         });
@@ -410,18 +409,18 @@ public class SettingsActivity extends BaseActivity {
     }
 
     private void refreshUpdateStatus() {
-        if (updateStatus == null || installRow == null) return;
-        File ready = Updater.readyUpdate(this);
-        if (ready != null) {
-            updateStatus.setText(Updater.versionOf(ready) + " ready");
+        if (updateStatus == null || downloadRow == null) return;
+        Updater.Release r = Updater.knownUpdate(this);
+        if (r != null) {
+            updateStatus.setText(r.version + " available");
             updateStatus.setTextColor(pal.primary);
-            installRow.setVisibility(View.VISIBLE);
-            ((TextView) ((LinearLayout) installRow).getChildAt(1)).setText("Version " + Updater.versionOf(ready) + " is downloaded and ready");
+            downloadRow.setVisibility(View.VISIBLE);
+            ((TextView) ((LinearLayout) downloadRow).getChildAt(1))
+                    .setText("Opens the download for version " + r.version + "; tap it when it finishes to install");
         } else {
-            long last = prefs.lastUpdateCheck();
-            updateStatus.setText(last == 0 ? "" : "Up to date");
+            updateStatus.setText(prefs.lastUpdateCheck() == 0 ? "" : "Up to date");
             updateStatus.setTextColor(getColor(R.color.on_surface_variant));
-            installRow.setVisibility(View.GONE);
+            downloadRow.setVisibility(View.GONE);
         }
     }
 
@@ -432,31 +431,29 @@ public class SettingsActivity extends BaseActivity {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                File apk = null;
-                String error = null;
+                Updater.Release r = null;
+                boolean failed = false;
                 try {
-                    apk = Updater.checkAndDownload(SettingsActivity.this);
+                    r = Updater.check(SettingsActivity.this);
                 } catch (Exception e) {
-                    error = e instanceof java.io.IOException && e.getMessage() != null && e.getMessage().startsWith("The downloaded")
-                            ? e.getMessage() : "Couldn't reach GitHub. Check your connection.";
+                    failed = true;
                 }
-                final File found = apk;
-                final String err = error;
+                final Updater.Release found = r;
+                final boolean error = failed;
                 main.post(new Runnable() {
                     @Override
                     public void run() {
                         checkingUpdate = false;
                         if (isDestroyed()) return;
                         refreshUpdateStatus();
-                        if (err != null) {
+                        if (error) {
                             updateStatus.setText("");
-                            notice.show(err, Notice.ERROR);
+                            notice.show("Couldn't reach GitHub. Check your connection.", Notice.ERROR);
                         } else if (found != null) {
-                            final File apkFile = found;
-                            notice.show("Version " + Updater.versionOf(found) + " is ready", Notice.SUCCESS, "Install", new Runnable() {
+                            notice.show("Version " + found.version + " is available", Notice.SUCCESS, "Download", new Runnable() {
                                 @Override
                                 public void run() {
-                                    Updater.install(SettingsActivity.this, apkFile, notice);
+                                    Updater.download(SettingsActivity.this, found, notice);
                                 }
                             });
                         } else {

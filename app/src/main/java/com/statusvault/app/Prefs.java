@@ -53,9 +53,11 @@ final class Prefs {
     void setLastUpdateCheck(long v) { p.edit().putLong("last_update_check", v).apply(); }
     String latestVersion() { return p.getString("latest_version", null); }
     void setLatestVersion(String v) { p.edit().putString("latest_version", v).apply(); }
-    /** The user was sent to "install unknown apps" and should get the install when they return. */
-    boolean pendingInstall() { return p.getBoolean("pending_install", false); }
-    void setPendingInstall(boolean v) { p.edit().putBoolean("pending_install", v).apply(); }
+    String latestApkUrl() { return p.getString("latest_apk_url", null); }
+    void setLatestApkUrl(String v) { p.edit().putString("latest_apk_url", v).apply(); }
+    /** Last version the background check already notified about. */
+    String notifiedVersion() { return p.getString("notified_version", null); }
+    void setNotifiedVersion(String v) { p.edit().putString("notified_version", v).apply(); }
 
     /** Tab on launch: 0 WhatsApp, 1 Business, 2 Saved, 3 wherever you left off. */
     int openOn() { return p.getInt("open_on", 3); }

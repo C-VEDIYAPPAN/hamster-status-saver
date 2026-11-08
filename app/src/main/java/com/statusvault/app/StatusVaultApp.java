@@ -38,6 +38,7 @@ public class StatusVaultApp extends Application implements Application.ActivityL
         AutoSaveJob.sync(this);
         Updater.createChannel(this);
         Updater.schedule(this);
+        Updater.cleanLegacy(this); // v2.8 kept downloaded updates in private storage
     }
 
     /** True while any of the app's screens is visible. */

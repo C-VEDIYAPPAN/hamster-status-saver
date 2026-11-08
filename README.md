@@ -26,7 +26,7 @@
 - **Auto-save** new statuses, optionally in the background
 - **App lock** with fingerprint, face or screen lock
 - **13 accent colours**, wallpaper colours (Android 12+), light and dark themes
-- **Automatic updates** from GitHub Releases, downloaded in the background
+- **Update alerts**: tells you when a new version is out, with a one-tap download
 
 ## Privacy
 
@@ -34,8 +34,8 @@ Nothing you view or save ever leaves your phone. There are no ads, no analytics 
 
 The app's only network use is checking this repository's
 [latest release](https://github.com/C-VEDIYAPPAN/StatusVault/releases/latest) for updates.
-You can switch it off in **Settings → Updates**. Downloaded updates are installed only if they're
-signed with the same key as the app you already have.
+You can switch it off in **Settings → Updates**. The app never installs anything itself;
+Android's installer does, and it only accepts updates signed with the same key.
 
 ## Install
 

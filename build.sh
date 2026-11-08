@@ -9,8 +9,8 @@ cd "$(dirname "$0")"
 ANDROID_JAR=${ANDROID_JAR:-/opt/asdk/android.jar}          # compile Java against API 35
 RES_JAR=${RES_JAR:-$ANDROID_JAR}                          # link resources (older aapt2 needs API <= 34)
 DX=${DX:-$(command -v dalvik-exchange || command -v dx)}
-VERSION_CODE=19
-VERSION_NAME=2.8
+VERSION_CODE=20
+VERSION_NAME=2.9
 OUT=build
 SRC=app/src/main
 
