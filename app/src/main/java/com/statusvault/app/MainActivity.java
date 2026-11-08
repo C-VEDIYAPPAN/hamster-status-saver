@@ -98,6 +98,7 @@ public class MainActivity extends BaseActivity {
     private Button emptyAction;
     private ProgressBar progress;
     private FrameLayout floatingBar;
+    private GlowView barGlow;
     private View navIndicator;
     private LinearLayout navTabs, navActions;
     private final View[] statCards = new View[3];
@@ -148,6 +149,7 @@ public class MainActivity extends BaseActivity {
         emptyAction = (Button) findViewById(R.id.empty_action);
         progress = (ProgressBar) findViewById(R.id.progress);
         floatingBar = (FrameLayout) findViewById(R.id.floating_bar);
+        barGlow = (GlowView) findViewById(R.id.bar_glow);
         navIndicator = findViewById(R.id.nav_indicator);
         navTabs = (LinearLayout) findViewById(R.id.nav_tabs);
         navActions = (LinearLayout) findViewById(R.id.nav_actions);
@@ -331,12 +333,40 @@ public class MainActivity extends BaseActivity {
 
     // ---------------- Rendering ----------------
 
+    /** Glass fill with a thin accent-gradient edge. */
+    private android.graphics.drawable.Drawable glowingBarBackground() {
+        float radius = dp(31);
+        android.graphics.drawable.GradientDrawable edge = new android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+                new int[]{(palette.primary & 0x00FFFFFF) | 0xB3000000, (palette.secondary & 0x00FFFFFF) | 0xB3000000});
+        edge.setCornerRadius(radius);
+        android.graphics.drawable.GradientDrawable fill = new android.graphics.drawable.GradientDrawable();
+        fill.setColor((getColor(R.color.surface) & 0x00FFFFFF) | 0xF7000000);
+        int e = Math.max(2, dp(1.5f));
+        fill.setCornerRadius(radius - e);
+        android.graphics.drawable.LayerDrawable ld = new android.graphics.drawable.LayerDrawable(
+                new android.graphics.drawable.Drawable[]{edge, fill});
+        ld.setLayerInset(1, e, e, e, e);
+        return ld;
+    }
+
     /** Colours that depend on the accent: background glow, buttons, bar. */
     private void applyColors() {
         root.setBackground(palette.backgroundGlow(getColor(R.color.bg), getResources().getDisplayMetrics().widthPixels));
         progress.setIndeterminateTintList(ColorStateList.valueOf(palette.primary));
-        floatingBar.setBackground(palette.glass(getColor(R.color.surface), 31));
+        floatingBar.setBackground(glowingBarBackground());
         navIndicator.setBackground(palette.gradient(25));
+        barGlow.setColors(palette.primary, palette.secondary);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            // Coloured shadows: the bar and its sliding pill glow in the accent colour
+            floatingBar.setOutlineSpotShadowColor(palette.primary);
+            floatingBar.setOutlineAmbientShadowColor(palette.primary);
+            navIndicator.setOutlineSpotShadowColor(palette.primary);
+            navIndicator.setOutlineAmbientShadowColor(palette.secondary);
+        }
+        navIndicator.setElevation(dp(6));
+        navTabs.setElevation(dp(8));   // keep icons/labels above the glowing pill
+        navActions.setElevation(dp(8));
         saveAll.setBackground(palette.rounded(palette.primary, 18));
         saveAll.setTextColor(palette.onPrimary);
         saveAll.setCompoundDrawableTintList(ColorStateList.valueOf(palette.onPrimary));
@@ -710,6 +740,7 @@ public class MainActivity extends BaseActivity {
         final View out = selecting ? navTabs : navActions;
         final View in = selecting ? navActions : navTabs;
         navIndicator.animate().alpha(selecting ? 0f : 1f).setDuration(160).start();
+        barGlow.animate().scaleX(selecting ? 0.9f : 1f).setDuration(200).start();
         out.animate().alpha(0f).translationY(dp(10)).setDuration(130).withEndAction(new Runnable() {
             @Override
             public void run() {
@@ -788,6 +819,13 @@ public class MainActivity extends BaseActivity {
                 lp.width = Math.min(screen - dp(32), dp(380));
                 lp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
                 floatingBar.setLayoutParams(lp);
+                // Glow sits behind the bar, a little larger so its blur spills out softly.
+                FrameLayout.LayoutParams glp = (FrameLayout.LayoutParams) barGlow.getLayoutParams();
+                glp.width = lp.width + dp(56);
+                glp.height = dp(62 + 56);
+                glp.bottomMargin = lp.bottomMargin - dp(28) + dp(4); // nudged down: light from below
+                glp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+                barGlow.setLayoutParams(glp);
                 // Let the grid scroll under the floating bar, but end above it.
                 grid.setPadding(grid.getPaddingLeft(), grid.getPaddingTop(), grid.getPaddingRight(),
                         bottomInset + dp(14 + 62 + 16));
@@ -1216,13 +1254,9 @@ public class MainActivity extends BaseActivity {
                 saveBtn.setPadding(dp(small ? 5 : 7), dp(small ? 5 : 7), dp(small ? 5 : 7), dp(small ? 5 : 7));
             }
 
-            // Story-style ring on statuses you haven't opened
+            // Unopened statuses: a small glowing, pulsing dot (no outline around the tile)
             boolean isNew = isStatus && prefs.newBadges() && !seen.contains(item.name);
-            if (isNew) {
-                ring.setRing(new int[]{palette.primary, palette.secondary, 0xFFFF6F91, 0xFFFFC75F, palette.primary});
-            } else {
-                ring.setHairline(0); // seen statuses: no outline at all
-            }
+            ring.setNewDot(isNew && !selecting ? palette.primary : 0);
             card.setBackground(palette.rounded(getColor(R.color.surface_variant), 18));
             ring.setSelected(isSelected);
 

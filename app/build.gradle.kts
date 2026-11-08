@@ -10,8 +10,8 @@ android {
         applicationId = "com.statusvault.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 9
+        versionName = "1.8"
     }
 
     // signing/statusvault.jks is git-ignored. CI restores it from the KEYSTORE_BASE64 secret.

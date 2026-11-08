@@ -169,7 +169,7 @@ public class SettingsActivity extends BaseActivity {
                 prefs.setSort(i);
             }
         }), segmentParams());
-        toggle(browsing, "Highlight new statuses", "A colourful, slowly turning ring around statuses you haven't opened",
+        toggle(browsing, "Highlight new statuses", "A small glowing dot on statuses you haven't opened",
                 prefs.newBadges(), new Toggle() {
                     @Override
                     public void changed(ToggleSwitch s, boolean on) {
@@ -375,19 +375,25 @@ public class SettingsActivity extends BaseActivity {
     private void addPreviewTile(LinearLayout row, int i, boolean gap) {
         int[] shades = {0x40, 0x2A, 0x50, 0x33, 0x46};
         boolean isNew = prefs.newBadges() && i % 3 == 0;
-        // Outer frame = story ring for "new"; inner = the tile itself.
         FrameLayout outer = new FrameLayout(this);
-        if (isNew) {
-            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable(
-                    android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
-                    new int[]{pal.primary, pal.secondary, 0xFFFF6F91, 0xFFFFC75F});
-            g.setCornerRadius(dp(13));
-            outer.setBackground(g);
-            outer.setPadding(dp(2), dp(2), dp(2), dp(2));
-        }
         FrameLayout tile = new FrameLayout(this);
         tile.setBackground(pal.rounded((pal.primary & 0x00FFFFFF) | (shades[i % shades.length] << 24), 11));
         outer.addView(tile, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        if (isNew) {
+            // Glowing dot, like on the real tiles
+            View halo = new View(this);
+            halo.setBackground(Palette.oval((pal.primary & 0x00FFFFFF) | 0x59000000));
+            FrameLayout.LayoutParams hp = new FrameLayout.LayoutParams(dp(14), dp(14), Gravity.TOP | Gravity.START);
+            hp.setMargins(dp(3), dp(3), 0, 0);
+            tile.addView(halo, hp);
+            View dot = new View(this);
+            android.graphics.drawable.GradientDrawable d = Palette.oval(pal.primary);
+            d.setStroke(dp(1), 0xF2FFFFFF);
+            dot.setBackground(d);
+            FrameLayout.LayoutParams dpp = new FrameLayout.LayoutParams(dp(8), dp(8), Gravity.TOP | Gravity.START);
+            dpp.setMargins(dp(6), dp(6), 0, 0);
+            tile.addView(dot, dpp);
+        }
 
         if (prefs.timeLeft()) {
             // Circular countdown, bottom-left

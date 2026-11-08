@@ -245,6 +245,13 @@
         </FrameLayout>
     </LinearLayout>
 
+    <!-- Breathing accent glow under the floating bar (size/position set in code) -->
+    <com.statusvault.app.GlowView
+        android:id="@+id/bar_glow"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_gravity="bottom|center_horizontal" />
+
     <!-- Floating glass tab bar; turns into an action bar while selecting -->
     <FrameLayout
         android:id="@+id/floating_bar"
