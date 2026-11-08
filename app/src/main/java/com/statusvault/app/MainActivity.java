@@ -1221,7 +1221,7 @@ public class MainActivity extends BaseActivity {
             if (isNew) {
                 ring.setRing(new int[]{palette.primary, palette.secondary, 0xFFFF6F91, 0xFFFFC75F, palette.primary});
             } else {
-                ring.setHairline(palette.dark ? 0x2EFFFFFF : 0x1F000000);
+                ring.setHairline(0); // seen statuses: no outline at all
             }
             card.setBackground(palette.rounded(getColor(R.color.surface_variant), 18));
             ring.setSelected(isSelected);
