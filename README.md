@@ -1,104 +1,81 @@
-# Status Vault
+<p align="center">
+  <img src="art/play-store-icon-512.png" width="96" alt="Status Vault logo" />
+</p>
 
-View, save and share WhatsApp and WhatsApp Business statuses on Android.
-Plain Java on the Android framework — **no libraries**, so the APK is under 100 KB.
+<h1 align="center">Status Vault</h1>
 
-## Install
+<p align="center">
+  A private, ad-free Android app to view, save and share WhatsApp statuses.<br/>
+  Lightweight (under 150 KB), no internet permission, open source.
+</p>
 
-1. Copy `StatusVault-v2.7.apk` to your phone and open it.
-2. Allow "Install unknown apps" for your file manager or browser when Android asks.
-3. Open **Status Vault** → tap **Grant access** → on the folder screen tap **Use this folder → Allow**.
+<p align="center">
+  <a href="https://github.com/C-VEDIYAPPAN/StatusVault/releases/latest"><b>Download the latest APK</b></a>
+</p>
 
-Requires Android 8.0+. Statuses only appear after you've viewed them in WhatsApp,
-and WhatsApp deletes them after 24 hours.
+---
 
 ## Features
 
-**Browse**
-- **WhatsApp / Business / Saved** sections with All · Photos · Videos filters, counts and total size
-- A small **glowing, pulsing dot** on statuses you haven't opened yet; tiles press in when touched
-- **Countdown timer** on each tile — a small ring that drains as WhatsApp's 24 hours run out (red under 3h)
-- Video length on every video tile; one-tap **Save all** for unsaved statuses
-- Sort by newest, oldest or largest; 2–5 column grid
+- **Browse** WhatsApp and WhatsApp Business statuses, plus everything you've saved
+- **Save** one status or all of them in one tap, to your phone's gallery
+- **Video player** with seek preview, double-tap to skip, speed control and mute
+- **Repost** a status to WhatsApp, or share it to any app
+- **Grab a photo** from any moment of a video
+- **Unopened dot** and a **countdown** showing how long until a status expires
+- **Auto-save** new statuses, optionally in the background
+- **App lock** with fingerprint, face or screen lock
+- **13 accent colours**, wallpaper colours (Android 12+), light and dark themes
 
-**Act**
-- **Multi-select** — long-press, then save, share or repost many at once (delete on the Saved tab)
-- **Repost to WhatsApp** — opens WhatsApp ready to post as your own status
-- **Grab a photo from a video** — pause anywhere and save that exact frame
-- Full-screen viewer: next / previous buttons (or swipe); tap to hide controls
-- **Video player**: frame-accurate seeking that plays from where you let go, a live frame preview above the seek bar while dragging, double-tap left/right to skip 5s, speed (0.5x–2x), mute
-- **Delete** saved items, from the viewer or in bulk (always confirms first)
-- Floating glass tab bar with a breathing accent glow that slides between sections and turns into an action bar while selecting
+## Privacy
 
-**Automate & protect**
-- **Auto-save** every new status when you open the app
-- **Background check** about once an hour, with a notification
-- **App lock** with fingerprint, face or screen lock; lock immediately / after 1 / after 5 minutes; hides the app's preview in recent apps
-- No internet permission — nothing leaves the phone
+Status Vault has **no internet permission**: nothing you view or save ever leaves your phone.
+There are no ads, no analytics and no accounts.
 
-**Settings** — live preview card, 13 accent colours plus Wallpaper colours (Android 12+),
-Light / Dark / System theme with a soft crossfade, grid slider, sort, open-on tab, badges,
-autoplay / start-muted videos, auto-save, app lock, storage clean-up, folder reset, reset settings.
+## Install
 
-## Build
+1. Download the APK from [Releases](https://github.com/C-VEDIYAPPAN/StatusVault/releases/latest) and open it on your phone.
+2. Allow "Install unknown apps" if Android asks.
+3. Open the app, tap **Grant access**, then **Use this folder → Allow**.
 
-**Android Studio:** open this folder, let Gradle sync, then *Build → Build APK(s)*.
-No dependencies to download besides the Android Gradle plugin.
-
-**Command line without Gradle** (how the included APK was built):
-
-```bash
-ANDROID_JAR=~/Android/Sdk/platforms/android-35/android.jar ./build.sh
-```
-
-Needs `aapt2`, `javac`, `d8`/`dx`, `zipalign` and `apksigner` on your PATH.
+Requires **Android 8.0 or newer**. Statuses appear after you've viewed them in WhatsApp,
+and WhatsApp removes them after 24 hours.
 
 ## How it works
 
-Android 11+ blocks apps from reading another app's files. WhatsApp keeps statuses in
-`Android/media/com.whatsapp/WhatsApp/Media/.Statuses` (Business: `com.whatsapp.w4b/WhatsApp Business/…`).
-The app opens the system folder picker directly inside that folder, the user approves it once,
-and the app keeps a persistent read grant (Storage Access Framework). Saving copies the file into
-MediaStore, which needs no storage permission on Android 10+.
+Since Android 11, apps can't read another app's files directly. Status Vault uses Android's
+folder picker (Storage Access Framework) to get read access to WhatsApp's `.Statuses` folder
+once, with your permission. Saved files go into `Pictures/StatusVault` and `Movies/StatusVault`
+through MediaStore, so no storage permission is needed on Android 10+.
 
-```
-app/src/main/java/com/statusvault/app/
-├── MainActivity.java       Sections, filters, grid, multi-select, auto-save
-├── SettingsActivity.java   Interactive settings with live preview
-├── LockActivity.java       App lock (BiometricPrompt / screen lock)
-├── AutoSaveJob.java        Hourly background auto-save + notification
-├── StatusVaultApp.java     Locks the app when it returns from background
-├── Prefs.java, Palette.java, BaseActivity.java   Settings, accent colours, theme override
-├── ViewerActivity.java     Swipe viewer: save, repost, share, frame grab, delete
-├── StatusRepository.java   SAF reading, MediaStore save/delete, frames, share copies
-├── ThumbnailLoader.java    Background image/video-frame thumbnails + memory cache
-├── ShareProvider.java      Serves shared files to other apps
-├── StatusSource.java       WhatsApp / Business folder locations
-├── StatusItem.java, AspectFrameLayout.java, SwipeFrameLayout.java
+## Build from source
+
+The app is plain Java on the Android framework, with no third-party libraries.
+
+**Android Studio:** open the project and choose *Build → Build APK(s)*.
+
+**Command line:**
+
+```bash
+./gradlew assembleRelease
 ```
 
-## Signing key
+Every push to `main` is built by GitHub Actions and published to
+[Releases](https://github.com/C-VEDIYAPPAN/StatusVault/releases).
 
-`signing/statusvault.jks` (password `statusvault`) signed this APK. Keep it: Android only
-installs updates signed with the same key. For a public release, make your own key and
-never share it.
+## Contributing
 
-## Logo
-
-`art/logo.svg` and `art/play-store-icon-512.png`. The launcher icon is an adaptive vector,
-including a monochrome version for Android 13+ themed icons.
-
-## Publishing
-
-Don't put "WhatsApp" in the app name, icon or store title — Google removes apps that do.
-"Works with WhatsApp" in the description is the usual approach.
+Issues and pull requests are welcome. Please keep the app free of trackers, ads and
+network access.
 
 ## License
 
-Status Vault is free software: you can redistribute it and/or modify it under the terms of the
-[GNU General Public License v3.0](LICENSE) as published by the Free Software Foundation.
-Anyone who publishes a modified version must share its source code under the same licence.
-
 Copyright © 2026 Vediyappan
 
-Status Vault is not affiliated with, endorsed by, or connected to WhatsApp or Meta.
+Licensed under the [GNU General Public License v3.0](LICENSE). You may use, change and share
+this code; if you publish a modified version, you must share its source under the same licence.
+
+## Disclaimer
+
+Status Vault is an independent project and is not affiliated with, endorsed by, or connected to
+WhatsApp or Meta. Only save statuses you have permission to keep.
