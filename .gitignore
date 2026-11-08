@@ -1,17 +1,27 @@
+# Android Studio / Gradle
 *.iml
 .gradle/
 /local.properties
 /.idea/
-.DS_Store
 /build/
 /app/build/
 /captures/
 .externalNativeBuild/
 .cxx/
+
+# Build outputs
 *.apk
 *.aab
-*.jks
-/build/
-/signing/
 *.idsig
+
+# Signing secrets — never commit
+/signing/
+*.jks
+*.keystore
+keystore.properties
+KEYSTORE_BASE64*.txt
+
+# OS / tools
+.DS_Store
+Thumbs.db
 __pycache__/
