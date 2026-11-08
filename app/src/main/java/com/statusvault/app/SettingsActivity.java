@@ -36,6 +36,7 @@ public class SettingsActivity extends BaseActivity {
 
     private Prefs prefs;
     private Notice notice;
+    private LinearLayout lockDelayGroup;
     private Palette pal;
     private StatusRepository repo;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -225,7 +226,7 @@ public class SettingsActivity extends BaseActivity {
         // ---- Privacy ----
         section("Privacy");
         LinearLayout privacy = card();
-        toggle(privacy, "App lock", "Fingerprint, face or screen lock to open Status Vault",
+        toggle(privacy, "App lock", "Fingerprint, face or screen lock to open Status Vault. Also hides it in recent apps.",
                 prefs.appLock(), new Toggle() {
                     @Override
                     public void changed(ToggleSwitch s, boolean on) {
@@ -239,8 +240,20 @@ public class SettingsActivity extends BaseActivity {
                             StatusVaultApp.get().markUnlocked(); // don't lock the user out right now
                         }
                         prefs.setAppLock(on);
+                        StatusVaultApp.applyRecentsPrivacy(SettingsActivity.this);
+                        lockDelayGroup.setAlpha(on ? 1f : 0.45f);
+                        if (on) notice.show("App lock is on", Notice.SUCCESS);
                     }
                 });
+        label(privacy, "Lock after leaving the app", null);
+        lockDelayGroup = segmented(new String[]{"Immediately", "1 minute", "5 minutes"}, prefs.lockDelay(), new Choice() {
+            @Override
+            public void chosen(int i) {
+                prefs.setLockDelay(i);
+            }
+        });
+        privacy.addView(lockDelayGroup, segmentParams());
+        lockDelayGroup.setAlpha(prefs.appLock() ? 1f : 0.45f);
         TextView privacyNote = text("Everything stays on your phone. Status Vault has no internet permission.",
                 13, R.color.on_surface_variant, false);
         privacyNote.setPadding(0, dp(4), 0, dp(4));

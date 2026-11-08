@@ -15,15 +15,23 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
-/** Covers the app until the user passes fingerprint / face / screen-lock. */
+/**
+ * Covers the app until the user passes fingerprint / face / screen lock.
+ * The prompt is only requested once this screen is actually in front (newer Android cancels
+ * prompts asked for any earlier), and falls back to the phone's PIN screen if it can't be shown.
+ */
 public class LockActivity extends BaseActivity {
 
     private static final int REQ_CONFIRM = 1;
     private CancellationSignal cancel;
+    private boolean authInProgress;
+    private boolean autoPromptDone;
+    private TextView hint;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        StatusVaultApp.get().setLockShowing(true);
         Palette pal = new Palette(this);
 
         LinearLayout root = new LinearLayout(this);
@@ -49,17 +57,25 @@ public class LockActivity extends BaseActivity {
         title.setTextSize(20);
         title.setTextColor(getColor(R.color.on_surface));
         title.setGravity(Gravity.CENTER);
-        title.setPadding(0, dp(12), 0, dp(32));
+        title.setPadding(0, dp(12), 0, dp(6));
         root.addView(title);
+
+        hint = new TextView(this);
+        hint.setText("Use your fingerprint, face or screen lock");
+        hint.setTextSize(14);
+        hint.setTextColor(getColor(R.color.on_surface_variant));
+        hint.setGravity(Gravity.CENTER);
+        hint.setPadding(0, 0, 0, dp(28));
+        root.addView(hint);
 
         Button unlock = new Button(this);
         unlock.setText("Unlock");
         unlock.setAllCaps(false);
         unlock.setTextSize(16);
         unlock.setTextColor(pal.onPrimary);
-        unlock.setBackground(pal.rounded(pal.primary, 24));
+        unlock.setBackground(pal.gradient(26));
         unlock.setStateListAnimator(null);
-        unlock.setPadding(dp(40), 0, dp(40), 0);
+        unlock.setPadding(dp(44), 0, dp(44), 0);
         unlock.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -69,49 +85,92 @@ public class LockActivity extends BaseActivity {
         root.addView(unlock, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(52)));
 
         setContentView(root);
-        authenticate();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        // Ask once, automatically, as soon as the lock screen is really in front.
+        if (hasFocus && !autoPromptDone) {
+            autoPromptDone = true;
+            authenticate();
+        }
     }
 
     @SuppressWarnings("deprecation")
     private void authenticate() {
+        if (authInProgress) return;
         KeyguardManager km = getSystemService(KeyguardManager.class);
         if (km == null || !km.isDeviceSecure()) { // no screen lock set — nothing to check against
             unlocked();
             return;
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            BiometricPrompt.Builder b = new BiometricPrompt.Builder(this)
-                    .setTitle("Unlock Status Vault")
-                    .setSubtitle("Use your fingerprint, face or screen lock");
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                b.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK
-                        | BiometricManager.Authenticators.DEVICE_CREDENTIAL);
-            } else {
-                b.setDeviceCredentialAllowed(true);
-            }
-            cancel = new CancellationSignal();
-            b.build().authenticate(cancel, getMainExecutor(), new BiometricPrompt.AuthenticationCallback() {
-                @Override
-                public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
-                    unlocked();
+            try {
+                BiometricPrompt.Builder b = new BiometricPrompt.Builder(this)
+                        .setTitle("Unlock Status Vault")
+                        .setSubtitle("Use your fingerprint, face or screen lock");
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    b.setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_WEAK
+                            | BiometricManager.Authenticators.DEVICE_CREDENTIAL);
+                } else {
+                    b.setDeviceCredentialAllowed(true);
                 }
-                // Errors / cancel: stay on this screen; the Unlock button retries.
-            });
-        } else {
-            Intent i = km.createConfirmDeviceCredentialIntent("Unlock Status Vault", "Confirm your screen lock");
-            if (i == null) {
-                unlocked();
+                cancel = new CancellationSignal();
+                authInProgress = true;
+                b.build().authenticate(cancel, getMainExecutor(), new BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                        authInProgress = false;
+                        unlocked();
+                    }
+
+                    @Override
+                    public void onAuthenticationError(int code, CharSequence msg) {
+                        authInProgress = false;
+                        boolean userCancelled = code == BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED
+                                || code == BiometricPrompt.BIOMETRIC_ERROR_CANCELED;
+                        if (userCancelled) {
+                            hint.setText("Tap Unlock to try again");
+                        } else {
+                            useScreenLock(); // the prompt can't run here — use the phone's PIN screen
+                        }
+                    }
+                });
                 return;
+            } catch (RuntimeException e) {
+                authInProgress = false; // this phone rejected the prompt setup — fall back below
             }
-            StatusVaultApp.get().suppressNextLockCheck();
+        }
+        useScreenLock();
+    }
+
+    /** The phone's own PIN / pattern / password screen. */
+    @SuppressWarnings("deprecation")
+    private void useScreenLock() {
+        KeyguardManager km = getSystemService(KeyguardManager.class);
+        Intent i = km != null ? km.createConfirmDeviceCredentialIntent("Unlock Status Vault", "Confirm your screen lock") : null;
+        if (i == null) {
+            unlocked();
+            return;
+        }
+        authInProgress = true;
+        StatusVaultApp.get().suppressNextLockCheck();
+        try {
             startActivityForResult(i, REQ_CONFIRM);
+        } catch (RuntimeException e) {
+            authInProgress = false;
+            unlocked(); // never leave the user stuck on a screen they can't get past
         }
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQ_CONFIRM && resultCode == RESULT_OK) unlocked();
+        if (requestCode != REQ_CONFIRM) return;
+        authInProgress = false;
+        if (resultCode == RESULT_OK) unlocked();
+        else hint.setText("Tap Unlock to try again");
     }
 
     private void unlocked() {
@@ -130,6 +189,7 @@ public class LockActivity extends BaseActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        StatusVaultApp.get().setLockShowing(false);
         if (cancel != null) cancel.cancel();
     }
 }

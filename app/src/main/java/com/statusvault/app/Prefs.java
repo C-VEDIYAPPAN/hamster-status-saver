@@ -46,6 +46,18 @@ final class Prefs {
     boolean appLock() { return p.getBoolean("app_lock", false); }
     void setAppLock(boolean v) { p.edit().putBoolean("app_lock", v).apply(); }
 
+    /** App lock delay: 0 = immediately, 1 = after 1 minute, 2 = after 5 minutes. */
+    int lockDelay() { return p.getInt("lock_delay", 1); }
+    void setLockDelay(int v) { p.edit().putInt("lock_delay", v).apply(); }
+
+    long lockGraceMs() {
+        switch (lockDelay()) {
+            case 0: return 0;
+            case 2: return 5 * 60_000L;
+            default: return 60_000L;
+        }
+    }
+
     // ---- statuses the user has opened (for the NEW badge) ----
 
     Set<String> seen() {

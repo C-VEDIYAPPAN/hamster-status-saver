@@ -3,21 +3,27 @@ package com.statusvault.app;
 import android.app.Activity;
 import android.app.Application;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.view.WindowManager;
 
-/** Shows the lock screen when the app comes to the foreground (if App lock is on). */
+/**
+ * App lock coordinator: shows the lock screen when the app returns to the foreground,
+ * and hides the app's content from the recent-apps screen while App lock is on.
+ */
 public class StatusVaultApp extends Application implements Application.ActivityLifecycleCallbacks {
 
-    /** Coming back within this long (e.g. from the share sheet) doesn't re-lock. */
-    private static final long GRACE_MS = 60_000L;
-
     private static StatusVaultApp instance;
+
     private int started = 0;
     private boolean inBackground = true;
     private long backgroundSince = 0;
     private boolean unlocked = false;
+    private long unlockedAt = 0;
     private boolean suppressNextCheck = false;
+    /** True while a LockActivity exists, so a second one is never stacked on top. */
+    private boolean lockShowing = false;
 
     static StatusVaultApp get() {
         return instance;
@@ -34,11 +40,26 @@ public class StatusVaultApp extends Application implements Application.ActivityL
 
     void markUnlocked() {
         unlocked = true;
+        unlockedAt = SystemClock.elapsedRealtime();
     }
 
     /** Called before the lock screen opens another app (the system PIN screen on older Android). */
     void suppressNextLockCheck() {
         suppressNextCheck = true;
+    }
+
+    void setLockShowing(boolean showing) {
+        lockShowing = showing;
+    }
+
+    private boolean needsLock() {
+        Prefs prefs = new Prefs(this);
+        if (!prefs.appLock()) return false;
+        if (!unlocked) return true;
+        // Only a trip to the background that started *after* the last unlock counts. This is what
+        // stops the lock from coming straight back when Android's own PIN screen briefly covers us.
+        if (backgroundSince <= unlockedAt) return false;
+        return SystemClock.elapsedRealtime() - backgroundSince >= prefs.lockGraceMs();
     }
 
     @Override
@@ -50,25 +71,44 @@ public class StatusVaultApp extends Application implements Application.ActivityL
             suppressNextCheck = false;
             return;
         }
-        if (activity instanceof LockActivity || !new Prefs(this).appLock()) return;
-        boolean expired = SystemClock.elapsedRealtime() - backgroundSince > GRACE_MS;
-        if (!unlocked || expired) {
+        if (activity instanceof LockActivity || lockShowing) return;
+        if (needsLock()) {
             unlocked = false;
-            activity.startActivity(new Intent(activity, LockActivity.class));
-            activity.overridePendingTransition(0, 0);
+            lockShowing = true;
+            Intent i = new Intent(activity, LockActivity.class)
+                    .addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            activity.startActivity(i);
         }
     }
 
     @Override
     public void onActivityStopped(Activity activity) {
-        if (--started == 0 && !activity.isChangingConfigurations()) {
+        if (started > 0) started--;
+        if (started == 0 && !activity.isChangingConfigurations()) {
             inBackground = true;
             backgroundSince = SystemClock.elapsedRealtime();
         }
     }
 
+    @Override
+    public void onActivityResumed(Activity activity) {
+        applyRecentsPrivacy(activity);
+    }
+
+    /** With App lock on, recent apps shows a blank card instead of your statuses. */
+    static void applyRecentsPrivacy(Activity activity) {
+        boolean hide = new Prefs(activity).appLock();
+        if (Build.VERSION.SDK_INT >= 33) {
+            activity.setRecentsScreenshotEnabled(!hide);
+        } else if (hide) {
+            // Older Android has no "hide preview" switch; FLAG_SECURE also blanks the preview.
+            activity.getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        } else {
+            activity.getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        }
+    }
+
     @Override public void onActivityCreated(Activity a, Bundle b) {}
-    @Override public void onActivityResumed(Activity a) {}
     @Override public void onActivityPaused(Activity a) {}
     @Override public void onActivitySaveInstanceState(Activity a, Bundle b) {}
     @Override public void onActivityDestroyed(Activity a) {}
