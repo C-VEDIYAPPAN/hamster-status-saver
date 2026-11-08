@@ -35,6 +35,7 @@ public class SettingsActivity extends BaseActivity {
     private static final int REQ_NOTIFICATIONS = 1;
 
     private Prefs prefs;
+    private Notice notice;
     private Palette pal;
     private StatusRepository repo;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -56,6 +57,12 @@ public class SettingsActivity extends BaseActivity {
         prefs = new Prefs(this);
         repo = new StatusRepository(this);
         pal = new Palette(this);
+        notice = new Notice(this, new Notice.Offset() {
+            @Override
+            public int bottomPx() {
+                return Notice.navOverlap(SettingsActivity.this) + dp(24);
+            }
+        });
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -226,7 +233,7 @@ public class SettingsActivity extends BaseActivity {
                             KeyguardManager km = getSystemService(KeyguardManager.class);
                             if (km == null || !km.isDeviceSecure()) {
                                 s.setChecked(false, true);
-                                toast("Set a screen lock on your phone first");
+                                notice.show("Set a screen lock on your phone first", Notice.ERROR);
                                 return;
                             }
                             StatusVaultApp.get().markUnlocked(); // don't lock the user out right now
@@ -253,7 +260,7 @@ public class SettingsActivity extends BaseActivity {
         action(storage, "Clear temporary files", "Copies made for sharing", new Runnable() {
             public void run() {
                 long freed = clearShareCache();
-                toast(freed > 0 ? "Freed " + Formatter.formatShortFileSize(SettingsActivity.this, freed) : "Already clean");
+                notice.show(freed > 0 ? "Freed " + Formatter.formatShortFileSize(SettingsActivity.this, freed) : "Nothing to clean up", freed > 0 ? Notice.SUCCESS : Notice.INFO);
             }
         });
         for (final StatusSource src : StatusSource.values()) {
@@ -262,7 +269,7 @@ public class SettingsActivity extends BaseActivity {
                     granted ? "Access granted — tap to reset and pick again" : "Not set up yet", new Runnable() {
                         public void run() {
                             repo.revokeAccess(src);
-                            toast("Reset. Open the " + (src == StatusSource.WHATSAPP ? "WhatsApp" : "Business") + " tab to pick the folder again.");
+                            notice.show("Folder access reset. Open the " + (src == StatusSource.WHATSAPP ? "WhatsApp" : "Business") + " tab to choose it again.", Notice.INFO);
                         }
                     });
         }
@@ -452,7 +459,6 @@ public class SettingsActivity extends BaseActivity {
                     renderSwatches();
                     renderPreview();
                     restyleControls();
-                    toast(Palette.NAMES[idx]);
                 }
             });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(44), dp(44));
@@ -517,7 +523,7 @@ public class SettingsActivity extends BaseActivity {
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQ_NOTIFICATIONS && (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED)) {
-            toast("Auto-save still runs, but you won't get notifications");
+            notice.show("Auto-save will still run, just without notifications", Notice.INFO);
         }
     }
 
@@ -670,7 +676,5 @@ public class SettingsActivity extends BaseActivity {
         return tv.resourceId;
     }
 
-    private void toast(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-    }
+
 }

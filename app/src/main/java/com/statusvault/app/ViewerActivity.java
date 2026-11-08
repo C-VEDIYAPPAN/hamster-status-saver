@@ -86,6 +86,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private StatusRepository repo;
+    private Notice notice;
     private Prefs prefs;
 
     private final List<StatusItem> items = new ArrayList<>();
@@ -142,6 +143,16 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_viewer);
         repo = new StatusRepository(this);
+        // Messages sit just above whatever is showing at the bottom: video controls, actions, or nothing.
+        notice = new Notice(this, new Notice.Offset() {
+            @Override
+            public int bottomPx() {
+                int nav = Notice.navOverlap(ViewerActivity.this);
+                if (videoControls != null && videoControls.getVisibility() == View.VISIBLE) return nav + dp(12 + 80 + 8 + 52 + 10);
+                if (bottomBar != null && bottomBar.getVisibility() == View.VISIBLE) return nav + dp(12 + 80 + 10);
+                return nav + dp(24);
+            }
+        });
         prefs = new Prefs(this);
         accent = Palette.viewerPrimary(this);
         onAccent = Palette.viewerOnPrimary(this);
@@ -230,7 +241,6 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                 speedIndex = (speedIndex + 1) % SPEEDS.length;
                 updateSpeedLabel();
                 applySpeed();
-                toast(speedLabel() + " speed");
             }
         });
         muteBtn.setOnClickListener(new View.OnClickListener() {
@@ -361,7 +371,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
             public boolean onError(MediaPlayer mp, int what, int extra) {
                 player = null;
                 progress.setVisibility(View.GONE);
-                toast("Can't play this video");
+                notice.show("This video can't be played", Notice.ERROR);
                 return true;
             }
         });
@@ -483,7 +493,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                             if (token != loadToken || isDestroyed()) return;
                             progress.setVisibility(View.GONE);
                             if (bmp != null) image.setImageBitmap(bmp);
-                            else toast("Can't open this photo");
+                            else notice.show("This photo can't be opened", Notice.ERROR);
                         }
                     });
                 }
@@ -710,9 +720,9 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                         if (error != null) {
                             savedNames.remove(item.name);
                             updateActions();
-                            toast("Save failed: " + error);
+                            notice.show("Couldn't save. It may have just expired.", Notice.ERROR);
                         } else {
-                            toast(item.isVideo() ? "Saved to Movies/StatusVault" : "Saved to Pictures/StatusVault");
+                            notice.show(item.isVideo() ? "Video saved to gallery" : "Photo saved to gallery", Notice.SUCCESS);
                         }
                     }
                 });
@@ -735,10 +745,10 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                     public void run() {
                         if (isDestroyed()) return;
                         if (result == null || result.isEmpty()) {
-                            toast("Couldn't share this status");
+                            notice.show("Couldn't get this ready to share", Notice.ERROR);
                             return;
                         }
-                        MainActivity.launchShare(ViewerActivity.this, Collections.singletonList(item), result, pkg);
+                        MainActivity.launchShare(ViewerActivity.this, notice, Collections.singletonList(item), result, pkg);
                     }
                 });
             }
@@ -749,7 +759,6 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
     private void grabFrame(final StatusItem item) {
         if (!item.isVideo()) return;
         final long position = video.getCurrentPosition();
-        toast("Saving this frame…");
         io.execute(new Runnable() {
             @Override
             public void run() {
@@ -764,7 +773,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                     @Override
                     public void run() {
                         if (isDestroyed()) return;
-                        toast(error == null ? "Frame saved to Pictures/StatusVault" : "Couldn't save frame: " + error);
+                        notice.show(error == null ? "This frame was saved as a photo" : "Couldn't grab this frame", error == null ? Notice.SUCCESS : Notice.ERROR);
                     }
                 });
             }
@@ -809,7 +818,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                     public void run() {
                         if (isDestroyed()) return;
                         if (needsRegrant) askToRegrant();
-                        else if (error != null) toast("Delete failed: " + error);
+                        else if (error != null) notice.show("Couldn't delete. Please try again.", Notice.ERROR);
                         else removeCurrent();
                     }
                 });
@@ -832,7 +841,7 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                         try {
                             startActivityForResult(pick, REQ_REGRANT);
                         } catch (android.content.ActivityNotFoundException e) {
-                            toast("This phone has no folder picker");
+                            notice.show("Your phone doesn't have a folder picker", Notice.ERROR);
                         }
                     }
                 })
@@ -858,12 +867,12 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
                     public void run() {
                         if (isDestroyed()) return;
                         if (error != null) {
-                            toast("Delete failed: " + error);
+                            notice.show("Couldn't delete. Please try again.", Notice.ERROR);
                         } else if (confirm != null) {
                             try {
                                 startIntentSenderForResult(confirm, REQ_DELETE, null, 0, 0, 0);
                             } catch (IntentSender.SendIntentException e) {
-                                toast("Couldn't delete");
+                                notice.show("Couldn't delete. Please try again.", Notice.ERROR);
                             }
                         } else {
                             removeCurrent();
@@ -880,20 +889,20 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         if (requestCode == REQ_DELETE && resultCode == RESULT_OK) removeCurrent();
         if (requestCode == REQ_REGRANT && resultCode == RESULT_OK && data != null && data.getData() != null && source != null) {
             if (!repo.isStatusFolder(data.getData())) {
-                toast("That isn't the .Statuses folder");
+                notice.show("That's not the status folder", Notice.ERROR);
                 return;
             }
             try {
                 repo.grantAccess(source, data.getData());
                 deleteStatus(items.get(index)); // try again now that we can
             } catch (SecurityException e) {
-                toast("Couldn't keep access to that folder");
+                notice.show("Couldn't get access to that folder", Notice.ERROR);
             }
         }
     }
 
     private void removeCurrent() {
-        toast("Deleted");
+        notice.show("Deleted", Notice.SUCCESS);
         items.remove(index);
         if (items.isEmpty()) {
             finish();
@@ -907,7 +916,5 @@ public class ViewerActivity extends Activity implements SwipeFrameLayout.Listene
         return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
-    private void toast(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-    }
+
 }

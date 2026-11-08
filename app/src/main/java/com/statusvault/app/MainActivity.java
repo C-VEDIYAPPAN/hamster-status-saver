@@ -72,6 +72,14 @@ public class MainActivity extends BaseActivity {
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor();
     private StatusRepository repo;
+    private Notice notice;
+    /** "View" action on save messages: jump to the Saved tab. */
+    private final Runnable openSaved = new Runnable() {
+        @Override
+        public void run() {
+            switchSection(Section.SAVED);
+        }
+    };
     private Prefs prefs;
     private Palette palette;
     private int appliedTheme, appliedColumns, appliedAccent;
@@ -122,6 +130,13 @@ public class MainActivity extends BaseActivity {
         repo = new StatusRepository(this);
         prefs = new Prefs(this);
         palette = new Palette(this);
+        // Messages sit just above the floating bar.
+        notice = new Notice(this, new Notice.Offset() {
+            @Override
+            public int bottomPx() {
+                return bottomInset + dp(14 + 62 + 12);
+            }
+        });
         appliedTheme = prefs.theme();
         appliedColumns = prefs.columns();
         appliedAccent = prefs.accent();
@@ -322,7 +337,7 @@ public class MainActivity extends BaseActivity {
                         autoSaving = false;
                         if (isDestroyed()) return;
                         if (n > 0) {
-                            toast("Auto-saved " + n + (n == 1 ? " status" : " statuses"));
+                            notice.show("Auto-saved " + n + (n == 1 ? " new status" : " new statuses"), Notice.SUCCESS, "View", openSaved);
                             refresh();
                         }
                     }
@@ -898,7 +913,7 @@ public class MainActivity extends BaseActivity {
         try {
             startActivityForResult(intent, REQ_PICK_FOLDER + source.ordinal());
         } catch (ActivityNotFoundException e) {
-            toast("This phone has no folder picker");
+            notice.show("Your phone doesn't have a folder picker", Notice.ERROR);
         }
     }
 
@@ -906,7 +921,7 @@ public class MainActivity extends BaseActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_DELETE) {
-            if (resultCode == RESULT_OK) toast("Deleted");
+            if (resultCode == RESULT_OK) notice.show("Deleted", Notice.SUCCESS);
             return; // onResume reloads
         }
         int idx = requestCode - REQ_PICK_FOLDER;
@@ -915,13 +930,13 @@ public class MainActivity extends BaseActivity {
         Uri uri = data.getData();
         StatusSource source = StatusSource.values()[idx];
         if (!repo.isStatusFolder(uri)) {
-            toast("That isn't the .Statuses folder. Try again and tap “Use this folder” without moving.");
+            notice.show("That's not the status folder. Try again and tap \u201cUse this folder\u201d straight away.", Notice.ERROR);
             return;
         }
         try {
             repo.grantAccess(source, uri);
         } catch (SecurityException e) {
-            toast("Couldn't keep access to that folder");
+            notice.show("Couldn't get access to that folder. Please try again.", Notice.ERROR);
         }
         // onResume runs right after this and reloads.
     }
@@ -936,7 +951,7 @@ public class MainActivity extends BaseActivity {
         final List<StatusItem> todo = new ArrayList<>();
         for (StatusItem it : list) if (!savedNames.contains(it.name)) todo.add(it);
         if (todo.isEmpty()) {
-            toast(list.size() == 1 ? "Already saved" : "All already saved");
+            notice.show(list.size() == 1 ? "Already in your gallery" : "These are already in your gallery", Notice.INFO);
             return;
         }
         for (StatusItem it : todo) savedNames.add(it.name); // flip icons right away
@@ -965,12 +980,12 @@ public class MainActivity extends BaseActivity {
                         for (StatusItem it : failed) savedNames.remove(it.name);
                         if (failed.isEmpty()) {
                             if (todo.size() == 1) {
-                                toast(todo.get(0).isVideo() ? "Saved to Movies/StatusVault" : "Saved to Pictures/StatusVault");
+                                notice.show(todo.get(0).isVideo() ? "Video saved to gallery" : "Photo saved to gallery", Notice.SUCCESS, "View", openSaved);
                             } else {
-                                toast("Saved " + saved + " statuses");
+                                notice.show("Saved " + saved + " statuses to gallery", Notice.SUCCESS, "View", openSaved);
                             }
                         } else {
-                            toast("Saved " + saved + ", failed " + failed.size() + (err != null ? ": " + err : ""));
+                            notice.show(saved > 0 ? "Saved " + saved + " \u00b7 " + failed.size() + " couldn't be saved" : "Couldn't save. It may have just expired.", Notice.ERROR);
                         }
                         refresh();
                     }
@@ -1005,10 +1020,10 @@ public class MainActivity extends BaseActivity {
                     public void run() {
                         if (isDestroyed()) return;
                         if (result == null || result.isEmpty()) {
-                            toast("Couldn't share");
+                            notice.show("Couldn't get this ready to share", Notice.ERROR);
                             return;
                         }
-                        launchShare(MainActivity.this, list, result, pkg);
+                        launchShare(MainActivity.this, notice, list, result, pkg);
                     }
                 });
             }
@@ -1016,7 +1031,7 @@ public class MainActivity extends BaseActivity {
     }
 
     /** Opens the share sheet, or WhatsApp directly when [pkg] is set. */
-    static void launchShare(android.app.Activity a, List<StatusItem> list, ArrayList<Uri> uris, String pkg) {
+    static void launchShare(android.app.Activity a, Notice notice, List<StatusItem> list, ArrayList<Uri> uris, String pkg) {
         Intent send;
         if (uris.size() == 1) {
             send = new Intent(Intent.ACTION_SEND)
@@ -1043,7 +1058,7 @@ public class MainActivity extends BaseActivity {
                 a.startActivity(Intent.createChooser(send, "Share"));
             }
         } catch (ActivityNotFoundException e) {
-            Toast.makeText(a, pkg != null ? "WhatsApp isn't installed" : "No app can share this", Toast.LENGTH_SHORT).show();
+            notice.show(pkg != null ? "WhatsApp isn't installed" : "No app on your phone can share this", Notice.ERROR);
         }
     }
 
@@ -1095,9 +1110,9 @@ public class MainActivity extends BaseActivity {
                         if (regrant) {
                             askToRegrant(source);
                         } else if (err != null && deleted == 0) {
-                            toast("Delete failed: " + err);
+                            notice.show("Couldn't delete. Please try again.", Notice.ERROR);
                         } else {
-                            toast(deleted == 1 ? "Deleted" : "Deleted " + deleted + " statuses");
+                            notice.show(deleted == 1 ? "Deleted" : "Deleted " + deleted + " statuses", Notice.SUCCESS);
                         }
                         refresh();
                     }
@@ -1143,16 +1158,16 @@ public class MainActivity extends BaseActivity {
                     public void run() {
                         if (isDestroyed()) return;
                         if (err != null) {
-                            toast("Delete failed: " + err);
+                            notice.show("Couldn't delete. Please try again.", Notice.ERROR);
                         } else if (confirm != null) {
                             try {
                                 startIntentSenderForResult(confirm, REQ_DELETE, null, 0, 0, 0);
                             } catch (IntentSender.SendIntentException e) {
-                                toast("Couldn't delete");
+                                notice.show("Couldn't delete. Please try again.", Notice.ERROR);
                             }
                             return;
                         } else {
-                            toast(list.size() == 1 ? "Deleted" : "Deleted " + list.size() + " items");
+                            notice.show(list.size() == 1 ? "Deleted" : "Deleted " + list.size() + " items", Notice.SUCCESS);
                         }
                         refresh();
                     }
@@ -1188,9 +1203,7 @@ public class MainActivity extends BaseActivity {
         }
     }
 
-    private void toast(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
-    }
+
 
     static String timeLeftLabel(long millis) {
         long minutes = millis / 60_000L;
