@@ -42,6 +42,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -61,6 +62,7 @@ public class MainActivity extends BaseActivity {
     enum Filter { ALL, PHOTOS, VIDEOS }
 
     static final String EXTRA_OPEN_SAVED = "open_saved";
+    static final String EXTRA_INSTALL_UPDATE = "install_update";
 
     private static final int REQ_PICK_FOLDER = 100; // + source ordinal
     private static final int REQ_LEGACY_STORAGE = 200;
@@ -102,6 +104,8 @@ public class MainActivity extends BaseActivity {
     /** Selected items by URI; non-empty means selection mode. */
     private final Set<String> selected = new LinkedHashSet<>();
     private boolean loadedOnce, loading, autoSaving;
+    /** The "update ready" message is shown once per visit, not on every resume. */
+    private boolean updateOffered, updateChecking;
     private int loadGeneration = 0;
 
     // Views
@@ -236,6 +240,7 @@ public class MainActivity extends BaseActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         if (intent.getBooleanExtra(EXTRA_OPEN_SAVED, false)) switchSection(Section.SAVED);
+        if (intent.getBooleanExtra(EXTRA_INSTALL_UPDATE, false)) installReadyUpdate();
     }
 
     @Override
@@ -256,6 +261,67 @@ public class MainActivity extends BaseActivity {
         }
         // New statuses appear whenever the user views them in WhatsApp, so reload on return.
         refresh();
+        handleUpdates();
+    }
+
+    // ---------------- App updates ----------------
+
+    /** On open: finish a pending install, offer a downloaded update, or check GitHub (at most every 6h). */
+    private void handleUpdates() {
+        if (!Updater.available(this)) return;
+        if (getIntent().getBooleanExtra(EXTRA_INSTALL_UPDATE, false)) {
+            getIntent().removeExtra(EXTRA_INSTALL_UPDATE);
+            installReadyUpdate();
+            return;
+        }
+        if (prefs.pendingInstall() && Updater.canInstall(this)) { // back from "install unknown apps"
+            installReadyUpdate();
+            return;
+        }
+        final File ready = Updater.readyUpdate(this);
+        if (ready != null) {
+            offerUpdate(ready);
+            return;
+        }
+        boolean due = System.currentTimeMillis() - prefs.lastUpdateCheck() > 6 * 3600_000L;
+        if (!prefs.autoUpdate() || !due || updateChecking) return;
+        updateChecking = true;
+        io.execute(new Runnable() {
+            @Override
+            public void run() {
+                File apk = null;
+                try {
+                    apk = Updater.checkAndDownload(MainActivity.this);
+                } catch (Exception ignored) {
+                    // offline or GitHub unavailable — try again later
+                }
+                final File found = apk;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        updateChecking = false;
+                        if (found != null && !isDestroyed()) offerUpdate(found);
+                    }
+                });
+            }
+        });
+    }
+
+    private void offerUpdate(final File apk) {
+        if (updateOffered) return;
+        updateOffered = true;
+        notice.show("Update " + Updater.versionOf(apk) + " is ready", Notice.SUCCESS, "Install", new Runnable() {
+            @Override
+            public void run() {
+                Updater.install(MainActivity.this, apk, notice);
+            }
+        });
+    }
+
+    private void installReadyUpdate() {
+        File apk = Updater.readyUpdate(this);
+        if (apk != null) Updater.install(this, apk, notice);
+        else prefs.setPendingInstall(false);
     }
 
     @Override

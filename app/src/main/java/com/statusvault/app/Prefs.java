@@ -46,6 +46,17 @@ final class Prefs {
     boolean appLock() { return p.getBoolean("app_lock", false); }
     void setAppLock(boolean v) { p.edit().putBoolean("app_lock", v).apply(); }
 
+    // ---- updates ----
+    boolean autoUpdate() { return p.getBoolean("auto_update", true); }
+    void setAutoUpdate(boolean v) { p.edit().putBoolean("auto_update", v).apply(); }
+    long lastUpdateCheck() { return p.getLong("last_update_check", 0); }
+    void setLastUpdateCheck(long v) { p.edit().putLong("last_update_check", v).apply(); }
+    String latestVersion() { return p.getString("latest_version", null); }
+    void setLatestVersion(String v) { p.edit().putString("latest_version", v).apply(); }
+    /** The user was sent to "install unknown apps" and should get the install when they return. */
+    boolean pendingInstall() { return p.getBoolean("pending_install", false); }
+    void setPendingInstall(boolean v) { p.edit().putBoolean("pending_install", v).apply(); }
+
     /** Tab on launch: 0 WhatsApp, 1 Business, 2 Saved, 3 wherever you left off. */
     int openOn() { return p.getInt("open_on", 3); }
     void setOpenOn(int v) { p.edit().putInt("open_on", v).apply(); }
@@ -61,7 +72,7 @@ final class Prefs {
     /** Back to defaults. Keeps which statuses you've opened and deleted, and your last tab. */
     void resetSettings() {
         String[] keys = {"theme", "accent", "columns", "sort", "new_badges", "time_left", "auto_save",
-                "background_save", "app_lock", "lock_delay", "open_on", "autoplay", "start_muted"};
+                "background_save", "app_lock", "lock_delay", "open_on", "autoplay", "start_muted", "auto_update"};
         SharedPreferences.Editor e = p.edit();
         for (String k : keys) e.remove(k);
         e.apply();

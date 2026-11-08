@@ -36,6 +36,13 @@ public class StatusVaultApp extends Application implements Application.ActivityL
         registerActivityLifecycleCallbacks(this);
         AutoSaveJob.createChannel(this);
         AutoSaveJob.sync(this);
+        Updater.createChannel(this);
+        Updater.schedule(this);
+    }
+
+    /** True while any of the app's screens is visible. */
+    boolean isForeground() {
+        return started > 0;
     }
 
     void markUnlocked() {

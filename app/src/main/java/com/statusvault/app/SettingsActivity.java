@@ -293,7 +293,7 @@ public class SettingsActivity extends BaseActivity {
         });
         privacy.addView(lockDelayGroup, segmentParams());
         lockDelayGroup.setAlpha(prefs.appLock() ? 1f : 0.45f);
-        TextView privacyNote = text("Everything stays on your phone. Status Vault has no internet permission.",
+        TextView privacyNote = text("Everything stays on your phone. The app's only internet use is checking GitHub for updates, which you can turn off below.",
                 13, R.color.on_surface_variant, false);
         privacyNote.setPadding(0, dp(4), 0, dp(4));
         privacy.addView(privacyNote);
@@ -327,6 +327,8 @@ public class SettingsActivity extends BaseActivity {
         }
 
         // ---- About ----
+        buildUpdatesSection();
+
         section("About");
         LinearLayout about = card();
         String version = "1.0";
@@ -355,6 +357,115 @@ public class SettingsActivity extends BaseActivity {
                 confirmReset();
             }
         });
+    }
+
+    // ---------------- Updates ----------------
+
+    private TextView updateStatus;
+    private View installRow;
+    private boolean checkingUpdate;
+
+    private void buildUpdatesSection() {
+        section("Updates");
+        LinearLayout card = card();
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(0, dp(8), 0, dp(8));
+        row.addView(text("Status Vault " + Updater.currentVersion(this), 16, R.color.on_surface, false),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        updateStatus = text("", 14, R.color.on_surface_variant, false);
+        row.addView(updateStatus);
+        card.addView(row);
+
+        if (!Updater.available(this)) {
+            updateStatus.setText("via Google Play");
+            TextView t = text("Updates for this copy come from Google Play.", 13, R.color.on_surface_variant, false);
+            t.setPadding(0, 0, 0, dp(8));
+            card.addView(t);
+            return;
+        }
+        toggle(card, "Automatic updates",
+                "Checks GitHub about twice a day and downloads new versions in the background. "
+                        + "Android asks you to confirm the first install; later ones can be automatic (Android 12+).",
+                prefs.autoUpdate(), new Toggle() {
+                    @Override
+                    public void changed(ToggleSwitch s, boolean on) {
+                        prefs.setAutoUpdate(on);
+                        Updater.schedule(SettingsActivity.this);
+                    }
+                });
+        action(card, "Check for updates", "Look for a new version now", new Runnable() {
+            public void run() {
+                checkForUpdate();
+            }
+        });
+        installRow = actionView(card, "Install update", "A new version is downloaded and ready", new Runnable() {
+            public void run() {
+                File apk = Updater.readyUpdate(SettingsActivity.this);
+                if (apk != null) Updater.install(SettingsActivity.this, apk, notice);
+                else refreshUpdateStatus();
+            }
+        });
+        refreshUpdateStatus();
+    }
+
+    private void refreshUpdateStatus() {
+        if (updateStatus == null || installRow == null) return;
+        File ready = Updater.readyUpdate(this);
+        if (ready != null) {
+            updateStatus.setText(Updater.versionOf(ready) + " ready");
+            updateStatus.setTextColor(pal.primary);
+            installRow.setVisibility(View.VISIBLE);
+            ((TextView) ((LinearLayout) installRow).getChildAt(1)).setText("Version " + Updater.versionOf(ready) + " is downloaded and ready");
+        } else {
+            long last = prefs.lastUpdateCheck();
+            updateStatus.setText(last == 0 ? "" : "Up to date");
+            updateStatus.setTextColor(getColor(R.color.on_surface_variant));
+            installRow.setVisibility(View.GONE);
+        }
+    }
+
+    private void checkForUpdate() {
+        if (checkingUpdate) return;
+        checkingUpdate = true;
+        updateStatus.setText("Checking\u2026");
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                File apk = null;
+                String error = null;
+                try {
+                    apk = Updater.checkAndDownload(SettingsActivity.this);
+                } catch (Exception e) {
+                    error = e instanceof java.io.IOException && e.getMessage() != null && e.getMessage().startsWith("The downloaded")
+                            ? e.getMessage() : "Couldn't reach GitHub. Check your connection.";
+                }
+                final File found = apk;
+                final String err = error;
+                main.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        checkingUpdate = false;
+                        if (isDestroyed()) return;
+                        refreshUpdateStatus();
+                        if (err != null) {
+                            updateStatus.setText("");
+                            notice.show(err, Notice.ERROR);
+                        } else if (found != null) {
+                            final File apkFile = found;
+                            notice.show("Version " + Updater.versionOf(found) + " is ready", Notice.SUCCESS, "Install", new Runnable() {
+                                @Override
+                                public void run() {
+                                    Updater.install(SettingsActivity.this, apkFile, notice);
+                                }
+                            });
+                        } else {
+                            notice.show("You're on the latest version", Notice.SUCCESS);
+                        }
+                    }
+                });
+            }
+        }).start();
     }
 
     private void confirmReset() {
@@ -764,6 +875,11 @@ public class SettingsActivity extends BaseActivity {
         sw.setColors(pal.primary, pal.onPrimary,
                 pal.dark ? 0xFF2B3534 : 0xFFE3ECEB,
                 pal.dark ? 0xFF8B9796 : 0xFF6F7979);
+    }
+
+    private View actionView(LinearLayout parent, String title, String subtitle, final Runnable run) {
+        action(parent, title, subtitle, run);
+        return parent.getChildAt(parent.getChildCount() - 1);
     }
 
     private void action(LinearLayout parent, String title, String subtitle, final Runnable run) {

@@ -6,7 +6,7 @@
 
 <p align="center">
   A private, ad-free Android app to view, save and share WhatsApp statuses.<br/>
-  Lightweight (under 150 KB), no internet permission, open source.
+  Lightweight and open source.
 </p>
 
 <p align="center">
@@ -26,11 +26,16 @@
 - **Auto-save** new statuses, optionally in the background
 - **App lock** with fingerprint, face or screen lock
 - **13 accent colours**, wallpaper colours (Android 12+), light and dark themes
+- **Automatic updates** from GitHub Releases, downloaded in the background
 
 ## Privacy
 
-Status Vault has **no internet permission**: nothing you view or save ever leaves your phone.
-There are no ads, no analytics and no accounts.
+Nothing you view or save ever leaves your phone. There are no ads, no analytics and no accounts.
+
+The app's only network use is checking this repository's
+[latest release](https://github.com/C-VEDIYAPPAN/StatusVault/releases/latest) for updates.
+You can switch it off in **Settings → Updates**. Downloaded updates are installed only if they're
+signed with the same key as the app you already have.
 
 ## Install
 
